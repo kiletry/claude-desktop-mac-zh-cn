@@ -12,7 +12,7 @@ Commands:
   launch-companion  Launch the separate offline companion`;
 
 const COMMANDS = new Set(['status', 'build-companion', 'launch-companion']);
-const RETIRED_COMMANDS = new Set(['install', 'update', 'restore']);
+const RETIRED_COMMANDS = new Set(['install', 'update', 'restore', 'build-localized-clone']);
 
 export async function runCli(argv, dependencies = {}) {
   const write = dependencies.write ?? console.log;
@@ -23,7 +23,7 @@ export async function runCli(argv, dependencies = {}) {
     return 0;
   }
   if (RETIRED_COMMANDS.has(command)) {
-    throw new UserError(`${command} is retired: this tool never patches or writes inside Claude.app.`);
+    throw new UserError(`${command} is retired: use the separate offline companion; this tool never patches, copies, or re-signs Claude.app.`);
   }
   if (!COMMANDS.has(command)) {
     throw new UserError(`Unknown command: ${command}`);
@@ -44,13 +44,20 @@ export async function runCli(argv, dependencies = {}) {
   const projectDir = dependencies.projectDir ?? join(process.cwd(), 'companion-macos');
   const outputDir = dependencies.outputDir ?? join(projectDir, '..', 'dist');
   const operation = command === 'build-companion'
-    ? (dependencies.buildCompanion ?? (() => buildCompanion({ projectDir, outputDir })))
+    ? () => (dependencies.buildCompanion ?? buildCompanion)({ appDir, version: app.version, projectDir, outputDir })
     : (dependencies.launchCompanion ?? (() => launchCompanion({ appPath: join(outputDir, 'Claude Chinese Companion.app') })));
   if (typeof operation !== 'function') {
     throw new UserError(`${command} is not available until the offline companion is installed.`);
   }
   try {
-    await operation();
+    const result = await operation();
+    if (command === 'build-companion' && result) {
+      output({
+        appPath: result.appPath,
+        translationVersion: result.translationVersion,
+        sourceCommit: result.sourceCommit,
+      });
+    }
   } finally {
     assertTrustedClaude(await inspect(appDir, dependencies.inspectOptions));
   }

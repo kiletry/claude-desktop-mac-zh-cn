@@ -11,6 +11,6 @@ let package = Package(
     targets: [
         .target(name: "CompanionCore", resources: [.process("Resources")]),
         .executableTarget(name: "ClaudeChineseCompanion", dependencies: ["CompanionCore"]),
-        .testTarget(name: "CompanionCoreTests", dependencies: ["CompanionCore", "ClaudeChineseCompanion"], resources: [.process("fixture.json")])
+        .testTarget(name: "CompanionCoreTests", dependencies: ["CompanionCore", "ClaudeChineseCompanion"], resources: [.process("fixture.json"), .process("ocr-fixture.json")])
     ]
 )

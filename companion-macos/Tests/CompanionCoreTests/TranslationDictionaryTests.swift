@@ -10,4 +10,13 @@ final class TranslationDictionaryTests: XCTestCase {
         XCTAssertEqual(dictionary.translation(for: settings), "设置")
         XCTAssertNil(dictionary.translation(for: .init(role: "AXButton", title: "Unseen control", value: nil, parentRole: "AXToolbar", frame: .zero)))
     }
+
+    func testUsesTheBundledOCRMapForVisibleText() throws {
+        let fixtureURL = try XCTUnwrap(Bundle.module.url(forResource: "fixture", withExtension: "json"))
+        let ocrFixtureURL = try XCTUnwrap(Bundle.module.url(forResource: "ocr-fixture", withExtension: "json"))
+        let dictionary = try TranslationDictionary(resourceURL: fixtureURL, ocrResourceURL: ocrFixtureURL)
+
+        XCTAssertEqual(dictionary.translation(forVisibleText: " New conversation "), "新建对话")
+        XCTAssertNil(dictionary.translation(forVisibleText: "A chat response must remain untranslated"))
+    }
 }
