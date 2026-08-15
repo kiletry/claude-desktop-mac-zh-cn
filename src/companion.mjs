@@ -17,7 +17,7 @@ export async function buildCompanion({ execFile = execFileDefault, projectDir, o
   const binary = join(projectDir, '.build', 'arm64-apple-macosx', 'release', 'ClaudeChineseCompanion');
   await cp(binary, join(contents, 'MacOS', 'ClaudeChineseCompanion'));
   await cp(join(projectDir, 'Sources', 'CompanionCore', 'Resources', 'zh-CN.json'), join(contents, 'Resources', 'zh-CN.json'));
-  await writeFile(join(contents, 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>CFBundleExecutable</key><string>ClaudeChineseCompanion</string><key>CFBundleIdentifier</key><string>com.kiletry.claude-chinese-companion</string><key>CFBundleName</key><string>Claude 中文伴侣</string><key>CFBundlePackageType</key><string>APPL</string><key>LSUIElement</key><true/></dict></plist>\n`);
+  await writeFile(join(contents, 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>CFBundleExecutable</key><string>ClaudeChineseCompanion</string><key>CFBundleIdentifier</key><string>com.kiletry.claude-chinese-companion</string><key>CFBundleName</key><string>Claude 中文伴侣</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>\n`);
   return { appPath, executablePath: join(contents, 'MacOS', 'ClaudeChineseCompanion') };
 }
 
