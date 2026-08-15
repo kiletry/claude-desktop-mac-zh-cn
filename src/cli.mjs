@@ -1,6 +1,7 @@
 import { CompatibilityError, UserError } from './errors.mjs';
 import { inspectClaudeApp } from './claude-inspector.mjs';
 import { planLocaleRegistryPatch } from './locale-patch.mjs';
+import { findPreferenceFiles, updateLocalePreference } from './preferences.mjs';
 import { applyTransaction, restoreTransaction } from './transaction.mjs';
 import { downloadTranslation, fetchUpstreamCatalog } from './upstream.mjs';
 import { selectTranslationVersion } from './version.mjs';
@@ -88,6 +89,11 @@ export async function runCli(argv, dependencies = {}) {
     throw new UserError('No supported Claude locale registry was found; refusing to install incomplete language resources');
   }
   const transaction = dependencies.applyTransaction ?? applyTransaction;
+  const preferenceFiles = await (dependencies.findPreferenceFiles ?? findPreferenceFiles)(homedir());
+  for (const destination of preferenceFiles) {
+    const original = await readFile(destination, 'utf8');
+    fileWrites.push({ destination, content: (dependencies.updateLocalePreference ?? updateLocalePreference)(original, 'zh-CN') });
+  }
   const result = await transaction({
     backupRoot: join(homedir(), 'Library', 'Application Support', 'Claude Desktop zh-CN', 'backups'),
     dryRun: options.dryRun,

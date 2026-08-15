@@ -64,6 +64,7 @@ test('install dry-run does not require signature acknowledgement or write', asyn
     inspectClaudeApp: async () => ({ version: '1.25927.0', signing: { verified: true }, layout: { i18nDir: '/fixture/i18n', assetsDir: null } }),
     fetchUpstreamCatalog: async () => ({ commit: 'abc', versions: ['1.25927.0.0'], owner: 'o', repo: 'r', ref: 'master' }),
     downloadTranslation: async () => ({ files: { 'ion-dist': { hello: '你好' } } }),
+    findPreferenceFiles: async () => [],
     applyTransaction: async () => { applied = true; return { changedFiles: [] }; },
     writeJson: () => {},
   });
