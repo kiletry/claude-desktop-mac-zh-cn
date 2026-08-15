@@ -1,4 +1,10 @@
-# Claude Desktop macOS Chinese Installer Design
+# Superseded: Claude Desktop macOS Chinese Installer Design
+
+> **Safety notice (2026-08-15):** This resource-patching design is superseded
+> by [the external offline companion design](2026-08-15-claude-external-zh-cn-companion-design.md).
+> Editing `Claude.app` invalidated its signature in real use and must not be
+> implemented or distributed. This document is retained only as historical
+> context.
 
 ## Goal
 
