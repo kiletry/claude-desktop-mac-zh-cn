@@ -22,7 +22,12 @@ public enum OverlayLayout {
         screenFrame: CGRect
     ) -> [OverlayLabel] {
         translations.compactMap { element, text in
-            guard !text.isEmpty, !screenFrame.isNull, !screenFrame.isEmpty else {
+            guard !text.isEmpty,
+                  !screenFrame.isNull,
+                  !screenFrame.isEmpty,
+                  !element.frame.isNull,
+                  !element.frame.isEmpty,
+                  element.frame.intersects(screenFrame) else {
                 return nil
             }
 
