@@ -66,7 +66,7 @@ export async function runCli(argv, dependencies = {}) {
   const fileWrites = [];
   for (const [key, destination] of Object.entries({
     'ion-dist': join(app.layout.i18nDir, 'zh-CN.json'),
-    'desktop-shell': app.layout.desktopShellDir ? join(app.layout.desktopShellDir, 'zh-CN.json') : null,
+    'desktop-shell': app.resourcesDir ? join(app.resourcesDir, 'zh-CN.json') : null,
     dynamic: app.layout.dynamicDir ? join(app.layout.dynamicDir, 'zh-CN.json') : null,
   })) {
     if (translation.files[key] && destination) fileWrites.push({ destination, content: translation.files[key] });

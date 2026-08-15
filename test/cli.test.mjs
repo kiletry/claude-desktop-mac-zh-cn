@@ -70,3 +70,21 @@ test('install dry-run does not require signature acknowledgement or write', asyn
   });
   assert.equal(applied, true);
 });
+
+test('install maps desktop-shell translations to the root locale file', async () => {
+  let capturedPlan;
+  await runCli(['install', '--dry-run'], {
+    inspectClaudeApp: async () => ({
+      version: '1.25927.0',
+      resourcesDir: '/fixture/resources',
+      signing: { verified: true },
+      layout: { i18nDir: '/fixture/i18n', assetsDir: null },
+    }),
+    fetchUpstreamCatalog: async () => ({ commit: 'abc', versions: ['1.25927.0.0'], owner: 'o', repo: 'r', ref: 'master' }),
+    downloadTranslation: async () => ({ files: { 'ion-dist': { hello: '你好' }, 'desktop-shell': { menu: '设置' } } }),
+    findPreferenceFiles: async () => [],
+    applyTransaction: async ({ plan }) => { capturedPlan = plan; return { changedFiles: [] }; },
+    writeJson: () => {},
+  });
+  assert.ok(capturedPlan.fileWrites.some((file) => file.destination === '/fixture/resources/zh-CN.json'));
+});
