@@ -1,5 +1,8 @@
 import { CompatibilityError, UserError } from './errors.mjs';
 import { inspectClaudeApp } from './claude-inspector.mjs';
+import { buildCompanion, launchCompanion } from './companion.mjs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 const HELP = `Usage: claude-desktop-mac-zh-cn <command>
 
@@ -38,9 +41,11 @@ export async function runCli(argv, dependencies = {}) {
   }
 
   assertTrustedClaude(app);
+  const projectDir = dependencies.projectDir ?? join(process.cwd(), 'companion-macos');
+  const outputDir = dependencies.outputDir ?? join(projectDir, '..', 'dist');
   const operation = command === 'build-companion'
-    ? dependencies.buildCompanion
-    : dependencies.launchCompanion;
+    ? (dependencies.buildCompanion ?? (() => buildCompanion({ projectDir, outputDir })))
+    : (dependencies.launchCompanion ?? (() => launchCompanion({ appPath: join(outputDir, 'Claude Chinese Companion.app') })));
   if (typeof operation !== 'function') {
     throw new UserError(`${command} is not available until the offline companion is installed.`);
   }
