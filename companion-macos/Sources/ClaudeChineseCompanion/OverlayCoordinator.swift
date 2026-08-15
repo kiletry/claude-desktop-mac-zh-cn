@@ -2,10 +2,10 @@ import AppKit
 import CompanionCore
 
 @MainActor
-final class OverlayCoordinator {
+public final class OverlayCoordinator: OverlayRendering {
     private var panels: [OverlayPanel] = []
 
-    func render(_ labels: [OverlayLabel]) {
+    public func render(_ labels: [OverlayLabel]) {
         let reusablePanels = panels
         var renderedPanels: [OverlayPanel] = []
 
@@ -27,7 +27,7 @@ final class OverlayCoordinator {
         panels = renderedPanels
     }
 
-    func clear() {
+    public func clear() {
         panels.forEach { $0.close() }
         panels.removeAll()
     }
