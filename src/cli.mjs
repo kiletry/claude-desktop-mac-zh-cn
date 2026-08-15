@@ -44,8 +44,11 @@ export async function runCli(argv, dependencies = {}) {
   if (typeof operation !== 'function') {
     throw new UserError(`${command} is not available until the offline companion is installed.`);
   }
-  await operation();
-  assertTrustedClaude(await inspect(appDir, dependencies.inspectOptions));
+  try {
+    await operation();
+  } finally {
+    assertTrustedClaude(await inspect(appDir, dependencies.inspectOptions));
+  }
   return 0;
 }
 

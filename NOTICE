@@ -1,9 +1,10 @@
-Claude Desktop macOS Chinese Installer
+Claude Desktop macOS Chinese Companion
 
 Translation data source:
 https://github.com/ICERainbow666/claude-desktop-zh-cn
 
 This project thanks the upstream author and community for maintaining the
 Simplified Chinese translation files. This repository independently implements
-macOS version detection, resource deployment, backup, and restore logic. It
-does not redistribute Claude Desktop and is not affiliated with Anthropic.
+a separate offline macOS companion and never deploys resources to, backs up,
+or restores files inside Claude.app. It does not redistribute Claude Desktop
+and is not affiliated with Anthropic.

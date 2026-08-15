@@ -29,6 +29,39 @@ test('install rejects legacy patching before mutation is called', async () => {
   );
 });
 
+test('update and restore reject legacy patching before mutation is called', async () => {
+  for (const command of ['update', 'restore']) {
+    await assert.rejects(
+      runCli([command], {
+        applyTransaction: async () => { throw new Error('must not write'); },
+      }),
+      (error) => error instanceof UserError && /retired.*Claude\.app/i.test(error.message),
+    );
+  }
+});
+
+test('companion operation failure still performs the post-operation assessment', async () => {
+  let inspections = 0;
+  const trustedApp = {
+    bundleId: 'com.anthropic.claudefordesktop',
+    version: '1.25927.0',
+    signing: { verified: true },
+    gatekeeper: { accepted: true },
+  };
+
+  await assert.rejects(
+    runCli(['build-companion'], {
+      inspectClaudeApp: async () => {
+        inspections += 1;
+        return trustedApp;
+      },
+      buildCompanion: async () => { throw new Error('build failed'); },
+    }),
+    /build failed/,
+  );
+  assert.equal(inspections, 2);
+});
+
 test('typed and unknown errors map to stable nonzero exit codes', () => {
   assert.equal(asExitCode(new UserError('bad input')), 2);
   assert.equal(asExitCode(new CompatibilityError('unsupported')), 3);
