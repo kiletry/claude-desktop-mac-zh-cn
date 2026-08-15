@@ -1,72 +1,41 @@
 import AppKit
 import CompanionCore
-import SwiftUI
 
 @main
 @MainActor
-struct CompanionApp: App {
-    private let coordinator: OverlayCoordinator
-    private let monitor: ClaudeAccessibilityMonitor
-    @State private var enabled = false
-    @State private var permission = PermissionState.accessibility()
+final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
+    private var monitor: ClaudeAccessibilityMonitor?
+    private var toggleItem: NSMenuItem?
+    private var statusItem: NSStatusItem?
 
-    init() {
-        let coordinator = OverlayCoordinator()
-        let dictionary: TranslationDictionary
-        do {
-            dictionary = try TranslationDictionary.bundled()
-        } catch {
-            // An empty dictionary is fail-closed and leaves Claude unchanged.
-            dictionary = .empty
-        }
-        self.coordinator = coordinator
-        self.monitor = ClaudeAccessibilityMonitor(dictionary: dictionary, coordinator: coordinator)
+    func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
-    }
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.button?.title = "Claude 中文"
+        let menu = NSMenu()
+        let status = NSMenuItem(title: PermissionState.accessibility() == .granted ? "辅助功能已授权" : "需要辅助功能权限", action: nil, keyEquivalent: "")
+        status.isEnabled = false
+        menu.addItem(status)
+        let toggle = NSMenuItem(title: "启用中文界面", action: #selector(toggleTranslation), keyEquivalent: "")
+        toggle.target = self
+        menu.addItem(toggle)
+        menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
+        statusItem.menu = menu
+        self.statusItem = statusItem
+        self.toggleItem = toggle
 
-    var body: some Scene {
-        MenuBarExtra(statusTitle, systemImage: "character.book.closed") {
-            Text(statusTitle)
-                .font(.headline)
-
-            Divider()
-
-            Toggle("启用翻译", isOn: $enabled)
-                .onChange(of: enabled) { value in
-                    if value {
-                        permission = PermissionState.accessibility()
-                        if permission == .granted {
-                            monitor.start()
-                        } else {
-                            monitor.stop()
-                        }
-                    } else {
-                        monitor.stop()
-                    }
-                }
-
-            if permission == .missing {
-                Button("请求辅助功能权限") {
-                    PermissionState.requestAccessibilityPrompt()
-                    permission = PermissionState.accessibility()
-                }
-            }
-
-            Button("退出") {
-                monitor.stop()
-                NSApp.terminate(nil)
-            }
-            .keyboardShortcut("q")
+        if let url = Bundle.main.url(forResource: "zh-CN", withExtension: "json"),
+           let dictionary = try? TranslationDictionary(resourceURL: url) {
+            monitor = ClaudeAccessibilityMonitor(dictionary: dictionary, coordinator: OverlayCoordinator())
         }
-        .menuBarExtraStyle(.menu)
     }
 
-    private var statusTitle: String {
-        if permission == .missing { return "需要辅助功能权限" }
-        guard enabled else { return "等待 Claude" }
-        let isRunning = !NSRunningApplication.runningApplications(
-            withBundleIdentifier: ClaudeAccessibilityMonitor.officialBundleIdentifier
-        ).isEmpty
-        return isRunning ? "已启用" : "等待 Claude"
+    @objc private func toggleTranslation() {
+        guard let monitor, let toggleItem else { return }
+        toggleItem.state == .on ? monitor.stop() : monitor.start()
+        toggleItem.state = toggleItem.state == .on ? .off : .on
     }
+
+    @objc private func quit() { NSApp.terminate(nil) }
 }
