@@ -85,7 +85,13 @@ export async function runCli(argv, dependencies = {}) {
       }
     }
   }
-  if (app.layout.assetsDir && !fileWrites.some((file) => file.destination.endsWith('.js'))) {
+  const hasRegisteredLocale = app.layout.assetsDir
+    ? (await Promise.all((await readdir(app.layout.assetsDir))
+      .filter((name) => name.endsWith('.js'))
+      .map(async (name) => (await readFile(join(app.layout.assetsDir, name), 'utf8')).includes('"zh-CN"'))))
+      .some(Boolean)
+    : false;
+  if (app.layout.assetsDir && !hasRegisteredLocale && !fileWrites.some((file) => file.destination.endsWith('.js'))) {
     throw new UserError('No supported Claude locale registry was found; refusing to install incomplete language resources');
   }
   const transaction = dependencies.applyTransaction ?? applyTransaction;
