@@ -19,7 +19,8 @@ public struct TranslationDictionary: Sendable {
     }
 
     public static func bundled() throws -> TranslationDictionary {
-        guard let resourceURL = Bundle.module.url(forResource: "zh-CN", withExtension: "json") else {
+        guard let resourceURL = Bundle.module.url(forResource: "zh-CN", withExtension: "json")
+            ?? Bundle.main.url(forResource: "zh-CN", withExtension: "json") else {
             throw CocoaError(.fileNoSuchFile)
         }
         return try TranslationDictionary(resourceURL: resourceURL)
