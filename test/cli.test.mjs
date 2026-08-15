@@ -6,10 +6,11 @@ import test from 'node:test';
 import { runCli } from '../src/cli.mjs';
 import { CompatibilityError, PermissionError, UserError, asExitCode } from '../src/errors.mjs';
 
-test('help exposes all public commands', async () => {
+test('help exposes only the safe public commands', async () => {
   const output = [];
   await runCli(['--help'], { write: (line) => output.push(line) });
-  assert.match(output.join('\n'), /status.*install.*update.*restore/s);
+  assert.match(output.join('\n'), /status.*build-companion.*launch-companion/s);
+  assert.doesNotMatch(output.join('\n'), /\b(?:install|update|restore)\b/);
 });
 
 test('unknown commands reject with a user error', async () => {
@@ -19,13 +20,12 @@ test('unknown commands reject with a user error', async () => {
   );
 });
 
-test('real install requires explicit signature-risk acknowledgement', async () => {
+test('install rejects legacy patching before mutation is called', async () => {
   await assert.rejects(
     runCli(['install'], {
-      inspectClaudeApp: async () => ({ version: '1.25927.0', signing: { verified: true }, layout: { i18nDir: '/fixture/i18n', assetsDir: null } }),
-      fetchUpstreamCatalog: async () => ({ commit: 'abc', versions: ['1.25927.0.0'], owner: 'o', repo: 'r', ref: 'master' }),
+      applyTransaction: async () => { throw new Error('must not write'); },
     }),
-    (error) => error instanceof UserError && /accept-signature-risk/.test(error.message),
+    (error) => error instanceof UserError && /retired.*Claude\.app/i.test(error.message),
   );
 });
 
@@ -43,48 +43,21 @@ test('executable maps an unknown command to its process exit code', () => {
   assert.match(result.stderr, /Unknown command: unknown/);
 });
 
-test('status is read-only and reports the selected translation', async () => {
+test('status is read-only and reports the Claude assessment', async () => {
   const output = [];
   let writes = 0;
   const { runCli: cli } = await import('../src/cli.mjs');
   await cli(['status', '--app-dir', '/fixture/Claude.app'], {
     writeJson: (value) => output.push(value),
-    inspectClaudeApp: async () => ({ version: '1.25927.0', signing: { verified: true }, layout: { i18nDir: '/fixture/i18n', assetsDir: null } }),
-    fetchUpstreamCatalog: async () => ({ commit: 'abc', versions: ['1.25927.0.0'], owner: 'o', repo: 'r', ref: 'master' }),
+    inspectClaudeApp: async () => ({
+      bundleId: 'com.anthropic.claudefordesktop',
+      version: '1.25927.0',
+      signing: { verified: true },
+      gatekeeper: { accepted: true },
+    }),
     applyTransaction: async () => { writes += 1; },
     write: () => { writes += 1; },
   });
-  assert.equal(output[0].translation.exact, true);
+  assert.equal(output[0].gatekeeper.accepted, true);
   assert.equal(writes, 0);
-});
-
-test('install dry-run does not require signature acknowledgement or write', async () => {
-  let applied = false;
-  await runCli(['install', '--dry-run'], {
-    inspectClaudeApp: async () => ({ version: '1.25927.0', signing: { verified: true }, layout: { i18nDir: '/fixture/i18n', assetsDir: null } }),
-    fetchUpstreamCatalog: async () => ({ commit: 'abc', versions: ['1.25927.0.0'], owner: 'o', repo: 'r', ref: 'master' }),
-    downloadTranslation: async () => ({ files: { 'ion-dist': { hello: '你好' } } }),
-    findPreferenceFiles: async () => [],
-    applyTransaction: async () => { applied = true; return { changedFiles: [] }; },
-    writeJson: () => {},
-  });
-  assert.equal(applied, true);
-});
-
-test('install maps desktop-shell translations to the root locale file', async () => {
-  let capturedPlan;
-  await runCli(['install', '--dry-run'], {
-    inspectClaudeApp: async () => ({
-      version: '1.25927.0',
-      resourcesDir: '/fixture/resources',
-      signing: { verified: true },
-      layout: { i18nDir: '/fixture/i18n', assetsDir: null },
-    }),
-    fetchUpstreamCatalog: async () => ({ commit: 'abc', versions: ['1.25927.0.0'], owner: 'o', repo: 'r', ref: 'master' }),
-    downloadTranslation: async () => ({ files: { 'ion-dist': { hello: '你好' }, 'desktop-shell': { menu: '设置' } } }),
-    findPreferenceFiles: async () => [],
-    applyTransaction: async ({ plan }) => { capturedPlan = plan; return { changedFiles: [] }; },
-    writeJson: () => {},
-  });
-  assert.ok(capturedPlan.fileWrites.some((file) => file.destination === '/fixture/resources/zh-CN.json'));
 });
