@@ -10,6 +10,7 @@
     "claude-desktop-mac-zh-cn": "./bin/claude-desktop-mac-zh-cn.mjs"
   },
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "package": "npm pack --dry-run"
   }
 }

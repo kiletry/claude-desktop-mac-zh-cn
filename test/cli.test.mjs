@@ -19,10 +19,13 @@ test('unknown commands reject with a user error', async () => {
   );
 });
 
-test('known commands remain explicit until implemented', async () => {
+test('real install requires explicit signature-risk acknowledgement', async () => {
   await assert.rejects(
-    runCli(['status'], { write: () => {} }),
-    (error) => error instanceof UserError && /not implemented/.test(error.message),
+    runCli(['install'], {
+      inspectClaudeApp: async () => ({ version: '1.25927.0', signing: { verified: true }, layout: { i18nDir: '/fixture/i18n', assetsDir: null } }),
+      fetchUpstreamCatalog: async () => ({ commit: 'abc', versions: ['1.25927.0.0'], owner: 'o', repo: 'r', ref: 'master' }),
+    }),
+    (error) => error instanceof UserError && /accept-signature-risk/.test(error.message),
   );
 });
 
@@ -38,4 +41,31 @@ test('executable maps an unknown command to its process exit code', () => {
   const result = spawnSync(process.execPath, [bin, 'unknown'], { encoding: 'utf8' });
   assert.equal(result.status, 2);
   assert.match(result.stderr, /Unknown command: unknown/);
+});
+
+test('status is read-only and reports the selected translation', async () => {
+  const output = [];
+  let writes = 0;
+  const { runCli: cli } = await import('../src/cli.mjs');
+  await cli(['status', '--app-dir', '/fixture/Claude.app'], {
+    writeJson: (value) => output.push(value),
+    inspectClaudeApp: async () => ({ version: '1.25927.0', signing: { verified: true }, layout: { i18nDir: '/fixture/i18n', assetsDir: null } }),
+    fetchUpstreamCatalog: async () => ({ commit: 'abc', versions: ['1.25927.0.0'], owner: 'o', repo: 'r', ref: 'master' }),
+    applyTransaction: async () => { writes += 1; },
+    write: () => { writes += 1; },
+  });
+  assert.equal(output[0].translation.exact, true);
+  assert.equal(writes, 0);
+});
+
+test('install dry-run does not require signature acknowledgement or write', async () => {
+  let applied = false;
+  await runCli(['install', '--dry-run'], {
+    inspectClaudeApp: async () => ({ version: '1.25927.0', signing: { verified: true }, layout: { i18nDir: '/fixture/i18n', assetsDir: null } }),
+    fetchUpstreamCatalog: async () => ({ commit: 'abc', versions: ['1.25927.0.0'], owner: 'o', repo: 'r', ref: 'master' }),
+    downloadTranslation: async () => ({ files: { 'ion-dist': { hello: '你好' } } }),
+    applyTransaction: async () => { applied = true; return { changedFiles: [] }; },
+    writeJson: () => {},
+  });
+  assert.equal(applied, true);
 });

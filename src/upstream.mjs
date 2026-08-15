@@ -19,6 +19,12 @@ async function getJson(fetchImpl, url) {
   return response.json();
 }
 
+async function getText(fetchImpl, url) {
+  const response = await fetchImpl(url, { headers: { accept: 'application/vnd.github+json' } });
+  if (!response.ok) throw new CompatibilityError(`GitHub request failed (${response.status})`);
+  return response.text();
+}
+
 export async function fetchUpstreamCatalog({
   fetchImpl = globalThis.fetch,
   owner = DEFAULT_OWNER,
@@ -75,7 +81,14 @@ export async function downloadTranslation({ fetchImpl = globalThis.fetch, commit
     const sourcePath = `translated-zh-CN/${version}/${key}/zh-CN.json`;
     try {
       const payload = await getJson(fetchImpl, apiUrl(commit.owner, commit.repo, sourcePath, commit.ref));
-      const value = validateTranslationJson(decodeContent(payload, sourcePath), sourcePath);
+      const rawValue = payload.encoding === 'base64'
+        ? decodeContent(payload, sourcePath)
+        : payload.git_url
+          ? decodeContent(await getJson(fetchImpl, payload.git_url), sourcePath)
+        : payload.download_url
+          ? JSON.parse(await getText(fetchImpl, payload.download_url))
+          : null;
+      const value = validateTranslationJson(rawValue, sourcePath);
       files[key] = value;
       digests[key] = digestJson(value);
     } catch (error) {
