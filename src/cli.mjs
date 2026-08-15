@@ -1,4 +1,4 @@
-import { UserError } from './errors.mjs';
+import { CompatibilityError, UserError } from './errors.mjs';
 import { inspectClaudeApp } from './claude-inspector.mjs';
 import { planLocaleRegistryPatch } from './locale-patch.mjs';
 import { applyTransaction, restoreTransaction } from './transaction.mjs';
@@ -76,9 +76,16 @@ export async function runCli(argv, dependencies = {}) {
       const destination = join(app.layout.assetsDir, name);
       const original = await readFile(destination, 'utf8');
       if (!original.includes('"en-US"') || !original.includes('"id-ID"')) continue;
-      const patched = planLocaleRegistryPatch(original);
-      if (patched.changed) fileWrites.push({ destination, content: patched.text });
+      try {
+        const patched = planLocaleRegistryPatch(original);
+        if (patched.changed) fileWrites.push({ destination, content: patched.text });
+      } catch (error) {
+        if (!(error instanceof CompatibilityError) || !/No supported locale registry target/.test(error.message)) throw error;
+      }
     }
+  }
+  if (app.layout.assetsDir && !fileWrites.some((file) => file.destination.endsWith('.js'))) {
+    throw new UserError('No supported Claude locale registry was found; refusing to install incomplete language resources');
   }
   const transaction = dependencies.applyTransaction ?? applyTransaction;
   const result = await transaction({

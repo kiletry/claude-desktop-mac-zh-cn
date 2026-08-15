@@ -35,6 +35,6 @@ test('dry-run does not create backups or write files', async () => {
   const root = await mkdtemp(join(tmpdir(), 'claude-transaction-'));
   const target = join(root, 'zh-CN.json');
   const applied = await applyTransaction({ backupRoot: join(root, 'backups'), dryRun: true, plan: { fileWrites: [{ destination: target, content: 'new' }] } });
-  assert.equal(applied.changedFiles.length, 0);
+  assert.deepEqual(applied.changedFiles, [target]);
   await assert.rejects(readFile(target), /ENOENT/);
 });

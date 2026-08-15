@@ -16,7 +16,10 @@ async function atomicWrite(destination, content) {
 }
 
 export async function applyTransaction({ backupRoot, plan, dryRun = false }) {
-  if (dryRun) return { manifest: { dryRun: true, files: [], metadata: plan.metadata ?? {} }, changedFiles: [] };
+  if (dryRun) return {
+    manifest: { dryRun: true, files: [], metadata: plan.metadata ?? {} },
+    changedFiles: plan.fileWrites.map((file) => file.destination),
+  };
   const operationId = new Date().toISOString().replaceAll(/[:.]/g, '-');
   const operationDir = join(backupRoot, operationId);
   await mkdir(join(operationDir, 'originals'), { recursive: true });
