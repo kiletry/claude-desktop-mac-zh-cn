@@ -3,49 +3,45 @@ set -euo pipefail
 
 app_path=${1:?Usage: verify-single-overlay.zsh '/Applications/Claude Chinese Companion.app'}
 executable="$app_path/Contents/MacOS/ClaudeChineseCompanion"
+script_dir=${0:A:h}
+window_filter="$script_dir/count-visible-windows.swift"
 
-# Test-only command seams let the behavioral test drive controlled WindowServer
-# states. Normal verification always uses the absolute macOS system tools.
+# Test-only process/frontmost seams drive verifier branches; visible-window
+# counts still run through the same Swift filter used for live WindowServer data.
 pgrep_bin=${VERIFY_SINGLE_OVERLAY_PGREP_BIN:-/usr/bin/pgrep}
-swift_bin=${VERIFY_SINGLE_OVERLAY_SWIFT_BIN:-/usr/bin/swift}
 
-companion_pid=$("$pgrep_bin" -f -x "$executable" | /usr/bin/head -n 1 || true)
-[[ -n "$companion_pid" ]] || {
+pgrep_output=$("$pgrep_bin" -f -x "$executable" || true)
+[[ -n "$pgrep_output" ]] || {
   print -u2 "Claude Chinese Companion is not running."
   exit 2
 }
+companion_pids=("${(@f)pgrep_output}")
+if (( ${#companion_pids} != 1 )); then
+  print -u2 "Expected exactly one running Claude Chinese Companion process, found ${#companion_pids}."
+  exit 4
+fi
+companion_pid=$companion_pids[1]
 
-frontmost_bundle=$("$swift_bin" -e '
-  import AppKit
-  print(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "")
-')
+if [[ -n "${VERIFY_SINGLE_OVERLAY_FRONTMOST_BUNDLE+x}" ]]; then
+  frontmost_bundle=$VERIFY_SINGLE_OVERLAY_FRONTMOST_BUNDLE
+else
+  frontmost_bundle=$(/usr/bin/swift -e '
+    import AppKit
+    print(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "")
+  ')
+fi
 [[ "$frontmost_bundle" == "com.anthropic.claudefordesktop" ]] || {
   print -u2 "Official Claude must be frontmost before overlay verification."
   exit 3
 }
 
-panel_count=$("$swift_bin" -e '
-  import Foundation
-  import CoreGraphics
-
-  let targetPID = Int(CommandLine.arguments[1])!
-  let windows = CGWindowListCopyWindowInfo(
-      [.optionOnScreenOnly, .excludeDesktopElements],
-      kCGNullWindowID
-  ) as? [[String: Any]] ?? []
-  let count = windows.filter { info in
-      let ownerPID = (info[kCGWindowOwnerPID as String] as? NSNumber)?.intValue
-      let layer = (info[kCGWindowLayer as String] as? NSNumber)?.intValue
-      let alpha = (info[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 0
-      let bounds = info[kCGWindowBounds as String] as? [String: Any] ?? [:]
-      let width = (bounds["Width"] as? NSNumber)?.doubleValue ?? 0
-      let height = (bounds["Height"] as? NSNumber)?.doubleValue ?? 0
-      return ownerPID == targetPID && layer == 3 && alpha > 0 && width > 0 && height > 0
-  }.count
-  print(count)
-' "$companion_pid")
+filter_args=(--pid "$companion_pid" --layer 3)
+if [[ -n "${VERIFY_WINDOWSERVER_FIXTURE:-}" ]]; then
+  filter_args=(--fixture "$VERIFY_WINDOWSERVER_FIXTURE" $filter_args)
+fi
+panel_count=$("$window_filter" $filter_args)
 [[ "$panel_count" == "1" ]] || {
   print -u2 "Expected one visible overlay panel, found $panel_count"
   exit 1
 }
-print "Verified one visible click-through overlay panel for companion pid $companion_pid."
+print "Verified one visible layer-3 overlay panel for companion pid $companion_pid."

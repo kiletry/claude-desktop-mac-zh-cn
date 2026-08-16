@@ -63,8 +63,9 @@ one-surface invariant with:
 scripts/verify-single-overlay.zsh '/Applications/Claude Chinese Companion.app'
 ```
 
-The verifier requires exactly one visible layer-3 companion panel. The
-companion's visible guidance window is checked separately by
+The verifier requires exactly one running companion process and exactly one
+visible layer-3 companion panel owned by that process. The companion's visible
+guidance window is checked separately by
 `scripts/verify-companion-window.zsh`; it is not counted as the overlay.
 
 ## Attribution
