@@ -60,7 +60,13 @@ public struct TranslationDictionary: Sendable {
     }
 
     public func translation(forVisibleText text: String) -> String? {
-        visibleTextTranslations[Self.normalized(text)]
+        let direct = Self.normalized(text)
+        if let translation = visibleTextTranslations[direct] {
+            return translation
+        }
+        let stripped = direct.trimmingCharacters(in: CharacterSet.letters.inverted)
+        guard stripped != direct else { return nil }
+        return visibleTextTranslations[stripped]
     }
 
     private static func normalized(_ text: String) -> String {

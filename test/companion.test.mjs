@@ -81,7 +81,14 @@ test('build signs the complete companion bundle with its bundle identity', async
 
   assert.deepEqual(calls, [
     { file: '/usr/bin/xcrun', args: ['swift', 'build', '-c', 'release'] },
-    { file: '/usr/bin/codesign', args: ['--force', '--sign', '-', '--timestamp=none', companionAppPath(outputDir)] },
+    {
+      file: '/usr/bin/codesign',
+      args: [
+        '--force', '--sign', '-', '--timestamp=none',
+        '--requirements', '=designated => identifier "com.kiletry.claude-chinese-companion"',
+        companionAppPath(outputDir),
+      ],
+    },
   ]);
   const info = await readFile(join(companionAppPath(outputDir), 'Contents', 'Info.plist'), 'utf8');
   assert.match(info, /NSScreenCaptureUsageDescription/);

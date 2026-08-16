@@ -53,11 +53,16 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
         }
         guard ScreenCapturePermission.granted else {
             ScreenCapturePermission.request()
+            ScreenCapturePermission.openSettings()
+            monitor.start()
             showPermissionGuidance()
             return
         }
         monitor.start()
         toggleItem.state = .on
+        NSRunningApplication.runningApplications(withBundleIdentifier: ClaudeAccessibilityMonitor.officialBundleIdentifier)
+            .first?
+            .activate(options: [.activateIgnoringOtherApps])
     }
 
     @objc private func quit() { NSApp.terminate(nil) }

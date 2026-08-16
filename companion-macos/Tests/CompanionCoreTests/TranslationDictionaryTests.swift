@@ -17,6 +17,7 @@ final class TranslationDictionaryTests: XCTestCase {
         let dictionary = try TranslationDictionary(resourceURL: fixtureURL, ocrResourceURL: ocrFixtureURL)
 
         XCTAssertEqual(dictionary.translation(forVisibleText: " New conversation "), "新建对话")
+        XCTAssertEqual(dictionary.translation(forVisibleText: "+ New"), "新建")
         XCTAssertNil(dictionary.translation(forVisibleText: "A chat response must remain untranslated"))
     }
 }

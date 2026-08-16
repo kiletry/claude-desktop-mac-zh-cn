@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 
 enum ScreenCapturePermission {
@@ -7,5 +8,10 @@ enum ScreenCapturePermission {
 
     static func request() {
         _ = CGRequestScreenCaptureAccess()
+    }
+
+    static func openSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") else { return }
+        NSWorkspace.shared.open(url)
     }
 }

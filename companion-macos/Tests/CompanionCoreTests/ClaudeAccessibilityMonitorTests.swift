@@ -23,6 +23,12 @@ final class ClaudeAccessibilityMonitorTests: XCTestCase {
 
         XCTAssertEqual(coordinator.clearCount, 1)
     }
+
+    func testOverlayPanelRemainsVisibleWhenCompanionDeactivates() {
+        let panel = OverlayPanel(overlayLabel: .init(text: "新建", frame: CGRect(x: 10, y: 10, width: 80, height: 24)))
+
+        XCTAssertFalse(panel.hidesOnDeactivate)
+    }
 }
 
 @MainActor

@@ -20,6 +20,7 @@ final class ScreenOCRMonitor {
     private let coordinator: OverlayRendering
     private var timer: Timer?
     private var started = false
+    private var lastDiagnostic: String?
 
     init(dictionary: TranslationDictionary, coordinator: OverlayRendering) {
         self.dictionary = dictionary
@@ -29,10 +30,7 @@ final class ScreenOCRMonitor {
     func start() {
         guard !started else { return }
         started = true
-        guard ScreenCapturePermission.granted else {
-            coordinator.clear()
-            return
-        }
+        diagnose("started preflight=\(ScreenCapturePermission.granted)")
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
@@ -47,11 +45,19 @@ final class ScreenOCRMonitor {
     }
 
     func refresh() {
-        guard started,
-              ScreenCapturePermission.granted,
-              NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleIdentifier,
-              let snapshot = frontmostClaudeWindow(),
-              let image = CGWindowListCreateImage(snapshot.bounds, .optionIncludingWindow, snapshot.id, [.bestResolution]) else {
+        guard started else { return }
+        guard NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleIdentifier else {
+            diagnose("claude-not-frontmost preflight=\(ScreenCapturePermission.granted)")
+            coordinator.clear()
+            return
+        }
+        guard let snapshot = frontmostClaudeWindow() else {
+            diagnose("claude-window-not-found")
+            coordinator.clear()
+            return
+        }
+        guard let image = CGWindowListCreateImage(snapshot.bounds, .optionIncludingWindow, snapshot.id, [.bestResolution]) else {
+            diagnose("window-capture-failed")
             coordinator.clear()
             return
         }
@@ -77,6 +83,7 @@ final class ScreenOCRMonitor {
             return OverlayLabel(text: translation, frame: screenFrame.insetBy(dx: -4, dy: -3))
         }
         coordinator.render(labels)
+        diagnose("captured image=\(image.width)x\(image.height) observations=\(observations.count) labels=\(labels.count)")
     }
 
     private func frontmostClaudeWindow() -> WindowSnapshot? {
@@ -111,5 +118,19 @@ final class ScreenOCRMonitor {
         let targetScreen = screen ?? NSScreen.screens.first { $0.frame.intersects(cgFrame) } ?? NSScreen.main
         guard let targetScreen else { return cgFrame }
         return CGRect(x: cgFrame.minX, y: targetScreen.frame.maxY - cgFrame.maxY, width: cgFrame.width, height: cgFrame.height)
+    }
+
+    private func diagnose(_ message: String) {
+        guard message != lastDiagnostic else { return }
+        lastDiagnostic = message
+        let line = "\(ISO8601DateFormatter().string(from: Date())) \(message)\n"
+        let url = URL(fileURLWithPath: "/tmp/claude-chinese-companion.debug.log")
+        if let data = line.data(using: .utf8), let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(data)
+            try? handle.close()
+        } else {
+            try? line.write(to: url, atomically: true, encoding: .utf8)
+        }
     }
 }

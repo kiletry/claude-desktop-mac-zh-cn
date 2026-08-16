@@ -22,3 +22,6 @@ let mapped = OCRCoordinateMapper.screenFrame(
     screen: screen
 )
 precondition(mapped == CGRect(x: 300, y: 420, width: 100, height: 35))
+
+let overlay = OverlayPanel(overlayLabel: .init(text: "新建", frame: CGRect(x: 10, y: 10, width: 80, height: 24)))
+precondition(!overlay.hidesOnDeactivate)

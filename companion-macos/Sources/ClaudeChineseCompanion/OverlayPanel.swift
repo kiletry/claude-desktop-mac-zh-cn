@@ -16,6 +16,7 @@ final class OverlayPanel: NSPanel {
         hasShadow = false
         level = .floating
         ignoresMouseEvents = true
+        hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
         label.alignment = .center
