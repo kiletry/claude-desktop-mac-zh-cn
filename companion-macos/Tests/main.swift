@@ -38,6 +38,49 @@ let projects = AccessibilityElement(
 )
 precondition(StaticInterfacePolicy.allows(projects, windowFrame: staticWindow))
 
+let safeTitlePrivateValue = AccessibilityElement(
+    role: "AXButton",
+    title: "Projects",
+    value: "private prompt",
+    identifier: "sidebar-projects",
+    isEnabled: true,
+    parentRole: "AXGroup",
+    ancestorRoles: ["AXWindow", "AXWebArea", "AXGroup"],
+    frame: CGRect(x: 20, y: 240, width: 180, height: 28)
+)
+precondition(
+    StaticInterfacePolicy.approvedSource(for: safeTitlePrivateValue, windowFrame: staticWindow)
+        == .title("Projects")
+)
+
+let privateTitleSafeValue = AccessibilityElement(
+    role: "AXButton",
+    title: "private prompt",
+    value: "New",
+    identifier: "sidebar-new",
+    isEnabled: true,
+    parentRole: "AXGroup",
+    ancestorRoles: ["AXWindow", "AXWebArea", "AXGroup"],
+    frame: CGRect(x: 20, y: 280, width: 180, height: 28)
+)
+precondition(
+    StaticInterfacePolicy.approvedSource(for: privateTitleSafeValue, windowFrame: staticWindow)
+        == .value("New")
+)
+
+let ambiguousStaticCopy = AccessibilityElement(
+    role: "AXButton",
+    title: "Projects",
+    value: "New",
+    identifier: "sidebar-projects",
+    isEnabled: true,
+    parentRole: "AXGroup",
+    ancestorRoles: ["AXWindow", "AXWebArea", "AXGroup"],
+    frame: CGRect(x: 20, y: 320, width: 180, height: 28)
+)
+precondition(StaticInterfacePolicy.approvedSource(for: ambiguousStaticCopy, windowFrame: staticWindow) == nil)
+precondition(!StaticInterfacePolicy.allows(ambiguousStaticCopy, windowFrame: staticWindow))
+
 let conversationTitle = AccessibilityElement(
     role: "AXButton",
     title: "Projects",

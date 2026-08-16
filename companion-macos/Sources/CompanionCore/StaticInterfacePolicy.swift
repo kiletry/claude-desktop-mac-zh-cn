@@ -1,6 +1,18 @@
 import Foundation
 
 public enum StaticInterfacePolicy {
+    public enum ApprovedSource: Equatable, Sendable {
+        case title(String)
+        case value(String)
+
+        public var text: String {
+            switch self {
+            case .title(let text), .value(let text):
+                return text
+            }
+        }
+    }
+
     private static let allowedCopy: Set<String> = [
         "Home", "Code", "New", "Projects", "Artifacts", "Customize",
         "Chats and tasks", "View all", "Filter and group recents",
@@ -29,7 +41,10 @@ public enum StaticInterfacePolicy {
         !rejectedRoles.contains(role) && !ancestorRoles.contains(where: rejectedRoles.contains)
     }
 
-    public static func allows(_ element: AccessibilityElement, windowFrame: CGRect) -> Bool {
+    public static func approvedSource(
+        for element: AccessibilityElement,
+        windowFrame: CGRect
+    ) -> ApprovedSource? {
         guard allowedRoles.contains(element.role),
               mayReadText(role: element.role, ancestorRoles: element.ancestorRoles),
               let identifier = element.identifier,
@@ -40,10 +55,24 @@ public enum StaticInterfacePolicy {
                (identifier.hasPrefix("toolbar-") && parentRole == "AXToolbar")),
               element.ancestorRoles.contains("AXWindow"),
               AccessibilityZonePolicy.permits(frame: element.frame, in: windowFrame) else {
-            return false
+            return nil
         }
-        return [element.title, element.value]
-            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .contains(where: allowedCopy.contains)
+
+        let approved = [
+            element.title.flatMap { title -> ApprovedSource? in
+                let text = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                return allowedCopy.contains(text) ? .title(text) : nil
+            },
+            element.value.flatMap { value -> ApprovedSource? in
+                let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                return allowedCopy.contains(text) ? .value(text) : nil
+            }
+        ].compactMap { $0 }
+        guard approved.count == 1 else { return nil }
+        return approved[0]
+    }
+
+    public static func allows(_ element: AccessibilityElement, windowFrame: CGRect) -> Bool {
+        approvedSource(for: element, windowFrame: windowFrame) != nil
     }
 }

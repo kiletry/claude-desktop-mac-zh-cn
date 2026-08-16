@@ -175,12 +175,14 @@ public final class ClaudeAccessibilityMonitor {
 
     private func translations(for snapshot: AccessibilitySnapshot) -> [(AccessibilityElement, String)] {
         snapshot.elements.compactMap { candidate in
-            guard StaticInterfacePolicy.allows(candidate, windowFrame: snapshot.windowFrame),
-                  let source = candidate.title ?? candidate.value,
-                  let chinese = dictionary.translation(forVisibleText: source) else {
+            guard let approvedSource = StaticInterfacePolicy.approvedSource(
+                for: candidate,
+                windowFrame: snapshot.windowFrame
+            ),
+                  let chinese = dictionary.translation(forVisibleText: approvedSource.text) else {
                 return nil
             }
-            return (candidate, chinese)
+            return (Self.sanitized(candidate, approvedSource: approvedSource), chinese)
         }
     }
 
@@ -283,8 +285,11 @@ public final class ClaudeAccessibilityMonitor {
                 ancestorRoles: ancestors,
                 frame: elementFrame
             )
-            if StaticInterfacePolicy.allows(candidate, windowFrame: windowFrame) {
-                elements.append(candidate)
+            if let approvedSource = StaticInterfacePolicy.approvedSource(
+                for: candidate,
+                windowFrame: windowFrame
+            ) {
+                elements.append(sanitized(candidate, approvedSource: approvedSource))
             }
         }
 
@@ -328,6 +333,32 @@ public final class ClaudeAccessibilityMonitor {
         return DisplayGeometry(
             accessibilityFrame: CGDisplayBounds(displayID),
             appKitFrame: screen.frame
+        )
+    }
+
+    private static func sanitized(
+        _ candidate: AccessibilityElement,
+        approvedSource: StaticInterfacePolicy.ApprovedSource
+    ) -> AccessibilityElement {
+        let title: String?
+        let value: String?
+        switch approvedSource {
+        case .title(let text):
+            title = text
+            value = nil
+        case .value(let text):
+            title = nil
+            value = text
+        }
+        return AccessibilityElement(
+            role: candidate.role,
+            title: title,
+            value: value,
+            identifier: candidate.identifier,
+            isEnabled: candidate.isEnabled,
+            parentRole: candidate.parentRole,
+            ancestorRoles: candidate.ancestorRoles,
+            frame: candidate.frame
         )
     }
 

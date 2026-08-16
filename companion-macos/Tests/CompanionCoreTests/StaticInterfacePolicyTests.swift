@@ -20,6 +20,33 @@ final class StaticInterfacePolicyTests: XCTestCase {
         XCTAssertTrue(StaticInterfacePolicy.allows(projects, windowFrame: window))
     }
 
+    func testApprovesSafeTitleWithoutExposingPrivateValue() {
+        let mixed = safeSidebarControl(title: "Projects", value: "private prompt")
+
+        XCTAssertEqual(
+            StaticInterfacePolicy.approvedSource(for: mixed, windowFrame: window),
+            .title("Projects")
+        )
+        XCTAssertTrue(StaticInterfacePolicy.allows(mixed, windowFrame: window))
+    }
+
+    func testApprovesSafeValueWithoutExposingPrivateTitle() {
+        let mixed = safeSidebarControl(title: "private prompt", value: "Projects")
+
+        XCTAssertEqual(
+            StaticInterfacePolicy.approvedSource(for: mixed, windowFrame: window),
+            .value("Projects")
+        )
+        XCTAssertTrue(StaticInterfacePolicy.allows(mixed, windowFrame: window))
+    }
+
+    func testRejectsAmbiguousAllowlistedTitleAndValue() {
+        let ambiguous = safeSidebarControl(title: "Projects", value: "New")
+
+        XCTAssertNil(StaticInterfacePolicy.approvedSource(for: ambiguous, windowFrame: window))
+        XCTAssertFalse(StaticInterfacePolicy.allows(ambiguous, windowFrame: window))
+    }
+
     func testRejectsConversationTitleInsideList() {
         let conversationTitle = AccessibilityElement(
             role: "AXButton",
@@ -93,5 +120,18 @@ final class StaticInterfacePolicyTests: XCTestCase {
             in: window
         ))
         XCTAssertFalse(AccessibilityZonePolicy.permits(frame: .zero, in: window))
+    }
+
+    private func safeSidebarControl(title: String?, value: String?) -> AccessibilityElement {
+        AccessibilityElement(
+            role: "AXButton",
+            title: title,
+            value: value,
+            identifier: "sidebar-projects",
+            isEnabled: true,
+            parentRole: "AXGroup",
+            ancestorRoles: ["AXWindow", "AXWebArea", "AXGroup"],
+            frame: CGRect(x: 20, y: 200, width: 180, height: 28)
+        )
     }
 }

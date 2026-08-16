@@ -50,6 +50,24 @@ final class ClaudeAccessibilityMonitorTests: XCTestCase {
                     identifier: "sidebar-projects", isEnabled: true,
                     parentRole: "AXGroup", ancestorRoles: ["AXWindow", "AXWebArea", "AXGroup"],
                     frame: CGRect(x: 20, y: 280, width: 200, height: 28)
+                ),
+                AccessibilityElement(
+                    role: "AXButton", title: "Projects", value: "private prompt",
+                    identifier: "sidebar-projects", isEnabled: true,
+                    parentRole: "AXGroup", ancestorRoles: ["AXWindow", "AXWebArea", "AXGroup"],
+                    frame: CGRect(x: 20, y: 320, width: 200, height: 28)
+                ),
+                AccessibilityElement(
+                    role: "AXButton", title: "private prompt", value: "New",
+                    identifier: "sidebar-new", isEnabled: true,
+                    parentRole: "AXGroup", ancestorRoles: ["AXWindow", "AXWebArea", "AXGroup"],
+                    frame: CGRect(x: 20, y: 360, width: 200, height: 28)
+                ),
+                AccessibilityElement(
+                    role: "AXButton", title: "Projects", value: "New",
+                    identifier: "sidebar-projects", isEnabled: true,
+                    parentRole: "AXGroup", ancestorRoles: ["AXWindow", "AXWebArea", "AXGroup"],
+                    frame: CGRect(x: 20, y: 400, width: 200, height: 28)
                 )
             ]
         )
@@ -67,12 +85,14 @@ final class ClaudeAccessibilityMonitorTests: XCTestCase {
         XCTAssertEqual(coordinator.surfaces.count, 1)
         XCTAssertEqual(coordinator.surfaces[0].windowID, 42)
         XCTAssertEqual(coordinator.surfaces[0].frame, CGRect(x: 0, y: 180, width: 1_200, height: 900))
-        XCTAssertEqual(coordinator.surfaces[0].patches.map(\.text), ["项目", "新建"])
+        XCTAssertEqual(coordinator.surfaces[0].patches.map(\.text), ["项目", "新建", "项目", "新建"])
         XCTAssertEqual(
             coordinator.surfaces[0].patches.map(\.frame),
             [
                 CGRect(x: 52, y: 674, width: 160, height: 24),
-                CGRect(x: 52, y: 634, width: 160, height: 24)
+                CGRect(x: 52, y: 634, width: 160, height: 24),
+                CGRect(x: 52, y: 554, width: 160, height: 24),
+                CGRect(x: 52, y: 514, width: 160, height: 24)
             ]
         )
         XCTAssertEqual(coordinator.legacyLabelRenderCount, 0)
