@@ -1,5 +1,8 @@
 import CoreGraphics
+import CoreText
+import Foundation
 
+// Retained while the current app target still renders legacy OCR labels.
 public struct OverlayLabel: Equatable, Sendable {
     public let text: String
     public let frame: CGRect
@@ -16,6 +19,67 @@ public enum OverlayLayout {
     private static let characterWidth: CGFloat = 16
     private static let lineHeight: CGFloat = 20
     private static let gap: CGFloat = 6
+
+    public static func patch(controlFrame: CGRect, text: String, isEnabled: Bool) -> OverlayPatch? {
+        guard !text.isEmpty, !controlFrame.isEmpty else { return nil }
+        guard let font = CTFontCreateUIFontForLanguage(.system, 13, nil) else { return nil }
+
+        let attributed = NSAttributedString(
+            string: text,
+            attributes: [kCTFontAttributeName as NSAttributedString.Key: font]
+        )
+        let line = CTLineCreateWithAttributedString(attributed)
+        let measuredWidth = ceil(CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))) + 4
+        let textFrame = CGRect(
+            x: controlFrame.minX + 32,
+            y: controlFrame.minY + 2,
+            width: controlFrame.width - 40,
+            height: controlFrame.height - 4
+        )
+
+        guard textFrame.width >= 40,
+              measuredWidth <= textFrame.width,
+              textFrame.minX >= controlFrame.minX,
+              textFrame.maxX <= controlFrame.maxX - 8,
+              textFrame.minY >= controlFrame.minY,
+              textFrame.maxY <= controlFrame.maxY else { return nil }
+
+        return OverlayPatch(text: text, frame: textFrame, isEnabled: isEnabled)
+    }
+
+    public static func surface(
+        windowID: CGWindowID,
+        windowFrame: CGRect,
+        display: DisplayGeometry,
+        appearance: OverlayAppearance,
+        translations: [(AccessibilityElement, String)]
+    ) -> OverlaySurface? {
+        let appKitWindow = AccessibilityCoordinateMapper.appKitFrame(windowFrame, on: display)
+        guard !appKitWindow.isNull, !appKitWindow.isEmpty else { return nil }
+
+        let localBounds = CGRect(origin: .zero, size: appKitWindow.size)
+        let patches = translations.compactMap { element, text -> OverlayPatch? in
+            let appKitControl = AccessibilityCoordinateMapper.appKitFrame(element.frame, on: display)
+            guard !appKitControl.isNull, !appKitControl.isEmpty else { return nil }
+
+            let localControl = CGRect(
+                x: appKitControl.minX - appKitWindow.minX,
+                y: appKitControl.minY - appKitWindow.minY,
+                width: appKitControl.width,
+                height: appKitControl.height
+            )
+            guard localBounds.contains(localControl) else { return nil }
+            return patch(controlFrame: localControl, text: text, isEnabled: element.isEnabled != false)
+        }
+
+        guard !patches.isEmpty else { return nil }
+        return OverlaySurface(
+            windowID: windowID,
+            frame: appKitWindow,
+            appearance: appearance,
+            patches: patches
+        )
+    }
 
     public static func labels(
         for translations: [(AccessibilityElement, String)],

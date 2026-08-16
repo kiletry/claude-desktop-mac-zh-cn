@@ -98,3 +98,34 @@ precondition(!AccessibilityZonePolicy.permits(
     in: staticWindow
 ))
 precondition(!AccessibilityZonePolicy.permits(frame: .zero, in: staticWindow))
+
+let primaryDisplay = DisplayGeometry(
+    accessibilityFrame: CGRect(x: 0, y: 0, width: 1_920, height: 1_080),
+    appKitFrame: CGRect(x: 0, y: 0, width: 1_920, height: 1_080)
+)
+precondition(AccessibilityCoordinateMapper.appKitFrame(
+    CGRect(x: 20, y: 100, width: 180, height: 28),
+    on: primaryDisplay
+) == CGRect(x: 20, y: 952, width: 180, height: 28))
+
+let scaledDisplay = DisplayGeometry(
+    accessibilityFrame: CGRect(x: 1_920, y: 0, width: 1_280, height: 720),
+    appKitFrame: CGRect(x: 1_920, y: 0, width: 2_560, height: 1_440)
+)
+precondition(AccessibilityCoordinateMapper.appKitFrame(
+    CGRect(x: 2_020, y: 50, width: 200, height: 40),
+    on: scaledDisplay
+) == CGRect(x: 2_120, y: 1_260, width: 400, height: 80))
+
+let chinesePatch = OverlayLayout.patch(
+    controlFrame: CGRect(x: 12, y: 20, width: 210, height: 28),
+    text: "项目",
+    isEnabled: true
+)
+precondition(chinesePatch?.frame.minX == 44)
+precondition(chinesePatch?.frame.maxX ?? .infinity <= 214)
+precondition(OverlayLayout.patch(
+    controlFrame: CGRect(x: 12, y: 20, width: 90, height: 28),
+    text: "筛选并分组最近记录",
+    isEnabled: true
+) == nil)
