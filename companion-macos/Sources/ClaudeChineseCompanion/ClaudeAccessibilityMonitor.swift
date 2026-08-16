@@ -4,8 +4,16 @@ import CompanionCore
 
 @MainActor
 public protocol OverlayRendering: AnyObject {
+    func render(_ surface: OverlaySurface)
+    @available(*, deprecated, message: "Temporary legacy OCR adapter; Task 5 removes it.")
     func render(_ labels: [OverlayLabel])
     func clear()
+}
+
+@MainActor
+public extension OverlayRendering {
+    /// Temporary no-op compatibility seam for pre-Task 3 test doubles. Task 5 removes it.
+    func render(_ surface: OverlaySurface) {}
 }
 
 @MainActor

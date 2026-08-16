@@ -1,13 +1,22 @@
 import AppKit
 import CompanionCore
 
-final class OverlayPanel: NSPanel {
-    private let label = NSTextField(labelWithString: "")
+@MainActor
+protocol OverlayPanelManaging: AnyObject {
+    func update(_ surface: OverlaySurface)
+    func show()
+    func hide()
+}
 
-    init(overlayLabel: OverlayLabel) {
+@MainActor
+final class OverlayPanel: NSPanel, OverlayPanelManaging {
+    private let canvas: OverlayCanvasView
+
+    init(surface: OverlaySurface) {
+        canvas = OverlayCanvasView(surface: surface)
         super.init(
-            contentRect: overlayLabel.frame,
-            styleMask: [.borderless],
+            contentRect: surface.frame,
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
@@ -18,25 +27,33 @@ final class OverlayPanel: NSPanel {
         ignoresMouseEvents = true
         hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        contentView = canvas
+    }
 
-        label.alignment = .center
-        label.font = .systemFont(ofSize: 14, weight: .medium)
-        label.textColor = .labelColor
-        label.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.9)
-        label.drawsBackground = true
-        label.wantsLayer = true
-        label.layer?.cornerRadius = 6
-        label.layer?.masksToBounds = true
-        contentView = label
-
-        setOverlayLabel(overlayLabel)
+    @available(*, deprecated, message: "Use init(surface:) with one window-sized overlay surface.")
+    convenience init(overlayLabel: OverlayLabel) {
+        self.init(
+            surface: OverlaySurface(
+                windowID: .max,
+                frame: overlayLabel.frame,
+                appearance: .light,
+                patches: [OverlayPatch(
+                    text: overlayLabel.text,
+                    frame: CGRect(origin: .zero, size: overlayLabel.frame.size),
+                    isEnabled: true
+                )]
+            )
+        )
     }
 
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    func setOverlayLabel(_ overlayLabel: OverlayLabel) {
-        setFrame(overlayLabel.frame, display: false)
-        label.stringValue = overlayLabel.text
+    func update(_ surface: OverlaySurface) {
+        setFrame(surface.frame, display: false)
+        canvas.update(surface)
     }
+
+    func show() { orderFrontRegardless() }
+    func hide() { orderOut(nil) }
 }

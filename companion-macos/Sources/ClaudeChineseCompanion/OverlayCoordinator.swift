@@ -3,39 +3,66 @@ import CompanionCore
 
 @MainActor
 public final class OverlayCoordinator: OverlayRendering {
-    private var panels: [OverlayPanel] = []
+    private static let legacyWindowID = CGWindowID.max
 
+    private var panels: [CGWindowID: any OverlayPanelManaging] = [:]
+    private let panelFactory: @MainActor (OverlaySurface) -> any OverlayPanelManaging
+
+    init(panelFactory: @MainActor @escaping (OverlaySurface) -> any OverlayPanelManaging = { OverlayPanel(surface: $0) }) {
+        self.panelFactory = panelFactory
+    }
+
+    public func render(_ surface: OverlaySurface) {
+        for (windowID, panel) in panels where windowID != surface.windowID {
+            panel.hide()
+        }
+
+        if let panel = panels[surface.windowID] {
+            panel.update(surface)
+            panel.show()
+        } else {
+            let created = panelFactory(surface)
+            created.show()
+            panels[surface.windowID] = created
+        }
+    }
+
+    /// Temporary Task 3 adapter for the legacy OCR monitor. Task 5 removes this API.
+    @available(*, deprecated, message: "Render OverlaySurface values instead. This compatibility adapter is removed in Task 5.")
     public func render(_ labels: [OverlayLabel]) {
-        let reusablePanels = panels
-        var renderedPanels: [OverlayPanel] = []
-
-        for (index, label) in labels.enumerated() {
-            let panel: OverlayPanel
-            if index < reusablePanels.count {
-                panel = reusablePanels[index]
-                panel.setOverlayLabel(label)
-            } else {
-                panel = OverlayPanel(overlayLabel: label)
-            }
-            panel.orderFrontRegardless()
-            renderedPanels.append(panel)
+        guard let surface = legacySurface(from: labels) else {
+            clear()
+            return
         }
-
-        for panel in reusablePanels.dropFirst(labels.count) {
-            panel.close()
-        }
-        panels = renderedPanels
+        render(surface)
     }
 
     public func clear() {
-        panels.forEach { $0.close() }
+        panels.values.forEach { $0.hide() }
         panels.removeAll()
     }
 
-    deinit {
-        let panels = panels
-        Task { @MainActor in
-            panels.forEach { $0.close() }
+    private func legacySurface(from labels: [OverlayLabel]) -> OverlaySurface? {
+        guard let first = labels.first else { return nil }
+        let frame = labels.dropFirst().reduce(first.frame) { $0.union($1.frame) }
+        guard !frame.isEmpty, !frame.isNull else { return nil }
+
+        let effectiveAppearance = NSApplication.shared.effectiveAppearance
+        let appearance: OverlayAppearance = effectiveAppearance.bestMatch(from: [.darkAqua]) == .darkAqua
+            ? .dark
+            : .light
+        let patches = labels.map { label in
+            OverlayPatch(
+                text: label.text,
+                frame: label.frame.offsetBy(dx: -frame.minX, dy: -frame.minY),
+                isEnabled: true
+            )
         }
+        return OverlaySurface(
+            windowID: Self.legacyWindowID,
+            frame: frame,
+            appearance: appearance,
+            patches: patches
+        )
     }
 }
