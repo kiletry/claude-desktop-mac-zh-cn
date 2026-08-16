@@ -25,7 +25,18 @@ final class ClaudeAccessibilityMonitorTests: XCTestCase {
     }
 
     func testOverlayPanelRemainsVisibleWhenCompanionDeactivates() {
-        let panel = OverlayPanel(overlayLabel: .init(text: "新建", frame: CGRect(x: 10, y: 10, width: 80, height: 24)))
+        let panel = OverlayPanel(
+            surface: OverlaySurface(
+                windowID: 42,
+                frame: CGRect(x: 10, y: 10, width: 80, height: 24),
+                appearance: .light,
+                patches: [OverlayPatch(
+                    text: "新建",
+                    frame: CGRect(x: 0, y: 0, width: 80, height: 24),
+                    isEnabled: true
+                )]
+            )
+        )
 
         XCTAssertFalse(panel.hidesOnDeactivate)
     }
@@ -35,6 +46,7 @@ final class ClaudeAccessibilityMonitorTests: XCTestCase {
 private final class RecordingCoordinator: OverlayRendering {
     private(set) var clearCount = 0
 
+    func render(_ surface: OverlaySurface) {}
     func render(_ labels: [OverlayLabel]) {}
 
     func clear() {

@@ -30,22 +30,6 @@ final class OverlayPanel: NSPanel, OverlayPanelManaging {
         contentView = canvas
     }
 
-    @available(*, deprecated, message: "Use init(surface:) with one window-sized overlay surface.")
-    convenience init(overlayLabel: OverlayLabel) {
-        self.init(
-            surface: OverlaySurface(
-                windowID: .max,
-                frame: overlayLabel.frame,
-                appearance: .light,
-                patches: [OverlayPatch(
-                    text: overlayLabel.text,
-                    frame: CGRect(origin: .zero, size: overlayLabel.frame.size),
-                    isEnabled: true
-                )]
-            )
-        )
-    }
-
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 

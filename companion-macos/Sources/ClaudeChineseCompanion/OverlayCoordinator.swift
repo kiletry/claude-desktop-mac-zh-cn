@@ -28,7 +28,6 @@ public final class OverlayCoordinator: OverlayRendering {
     }
 
     /// Temporary Task 3 adapter for the legacy OCR monitor. Task 5 removes this API.
-    @available(*, deprecated, message: "Render OverlaySurface values instead. This compatibility adapter is removed in Task 5.")
     public func render(_ labels: [OverlayLabel]) {
         guard let surface = legacySurface(from: labels) else {
             clear()
