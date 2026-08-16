@@ -16,6 +16,14 @@ public enum StaticInterfacePolicy {
         "AXTextArea", "AXTextField", "AXSearchField", "AXDocument",
         "AXList", "AXTable", "AXRow", "AXCell", "AXOutline"
     ]
+    private static let stableIdentifiers: Set<String> = [
+        "sidebar-home", "sidebar-code", "sidebar-new", "sidebar-projects",
+        "sidebar-artifacts", "sidebar-customize", "sidebar-chats-and-tasks",
+        "sidebar-view-all", "sidebar-filter-group-recents", "sidebar-import-memory",
+        "toolbar-search", "toolbar-collapse-sidebar", "toolbar-search-projects",
+        "toolbar-sort-projects", "toolbar-new-project", "toolbar-settings",
+        "toolbar-back", "toolbar-forward", "toolbar-help"
+    ]
 
     public static func mayReadText(role: String, ancestorRoles: [String]) -> Bool {
         !rejectedRoles.contains(role) && !ancestorRoles.contains(where: rejectedRoles.contains)
@@ -24,6 +32,13 @@ public enum StaticInterfacePolicy {
     public static func allows(_ element: AccessibilityElement, windowFrame: CGRect) -> Bool {
         guard allowedRoles.contains(element.role),
               mayReadText(role: element.role, ancestorRoles: element.ancestorRoles),
+              let identifier = element.identifier,
+              stableIdentifiers.contains(identifier),
+              element.isEnabled == true,
+              let parentRole = element.parentRole,
+              ((identifier.hasPrefix("sidebar-") && parentRole == "AXGroup") ||
+               (identifier.hasPrefix("toolbar-") && parentRole == "AXToolbar")),
+              element.ancestorRoles.contains("AXWindow"),
               AccessibilityZonePolicy.permits(frame: element.frame, in: windowFrame) else {
             return false
         }

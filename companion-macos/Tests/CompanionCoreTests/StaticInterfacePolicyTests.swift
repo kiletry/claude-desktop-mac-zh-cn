@@ -50,6 +50,33 @@ final class StaticInterfacePolicyTests: XCTestCase {
         XCTAssertFalse(StaticInterfacePolicy.allows(userTitle, windowFrame: window))
     }
 
+    func testRejectsAllowlistedCopyWhenStableIdentifierDoesNotMatchControl() {
+        let collidingConversationTitle = AccessibilityElement(
+            role: "AXButton",
+            title: "Projects",
+            value: nil,
+            identifier: "conversation-title",
+            isEnabled: true,
+            parentRole: "AXGroup",
+            ancestorRoles: ["AXWindow", "AXWebArea", "AXGroup"],
+            frame: CGRect(x: 20, y: 300, width: 180, height: 28)
+        )
+
+        XCTAssertFalse(StaticInterfacePolicy.allows(collidingConversationTitle, windowFrame: window))
+    }
+
+    func testRejectsIncompleteCompatibilityMetadata() {
+        let incomplete = AccessibilityElement(
+            role: "AXButton",
+            title: "Settings",
+            value: nil,
+            parentRole: "AXToolbar",
+            frame: CGRect(x: 500, y: 100, width: 120, height: 30)
+        )
+
+        XCTAssertFalse(StaticInterfacePolicy.allows(incomplete, windowFrame: window))
+    }
+
     func testRejectsEditableAndListContentBeforeTextRead() {
         XCTAssertFalse(StaticInterfacePolicy.mayReadText(role: "AXTextField", ancestorRoles: ["AXWindow"]))
         XCTAssertFalse(StaticInterfacePolicy.mayReadText(role: "AXButton", ancestorRoles: ["AXWindow", "AXList"]))

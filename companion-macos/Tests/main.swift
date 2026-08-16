@@ -61,6 +61,27 @@ let userTitle = AccessibilityElement(
 )
 precondition(!StaticInterfacePolicy.allows(userTitle, windowFrame: staticWindow))
 
+let collidingConversationTitle = AccessibilityElement(
+    role: "AXButton",
+    title: "Projects",
+    value: nil,
+    identifier: "conversation-title",
+    isEnabled: true,
+    parentRole: "AXGroup",
+    ancestorRoles: ["AXWindow", "AXWebArea", "AXGroup"],
+    frame: CGRect(x: 20, y: 300, width: 180, height: 28)
+)
+precondition(!StaticInterfacePolicy.allows(collidingConversationTitle, windowFrame: staticWindow))
+
+let incomplete = AccessibilityElement(
+    role: "AXButton",
+    title: "Settings",
+    value: nil,
+    parentRole: "AXToolbar",
+    frame: CGRect(x: 500, y: 100, width: 120, height: 30)
+)
+precondition(!StaticInterfacePolicy.allows(incomplete, windowFrame: staticWindow))
+
 precondition(StaticInterfacePolicy.mayReadText(role: "AXButton", ancestorRoles: ["AXWindow", "AXGroup"]))
 precondition(!StaticInterfacePolicy.mayReadText(role: "AXTextArea", ancestorRoles: ["AXWindow", "AXGroup"]))
 precondition(!StaticInterfacePolicy.mayReadText(role: "AXButton", ancestorRoles: ["AXWindow", "AXList"]))
