@@ -26,19 +26,6 @@ final class OverlayCoordinatorTests: XCTestCase {
         XCTAssertEqual(factory.createdPanels[1].showCount, 1)
     }
 
-    func testLegacyLabelsRenderAsOnePanel() {
-        let factory = RecordingOverlayPanelFactory()
-        let coordinator = OverlayCoordinator(panelFactory: factory.make(surface:))
-
-        coordinator.render([
-            OverlayLabel(text: "首页", frame: CGRect(x: 100, y: 100, width: 80, height: 24)),
-            OverlayLabel(text: "项目", frame: CGRect(x: 200, y: 100, width: 80, height: 24))
-        ])
-
-        XCTAssertEqual(factory.createdPanels.count, 1)
-        XCTAssertEqual(factory.createdPanels[0].surfaces[0].patches.count, 2)
-    }
-
     func testPanelRemainsVisibleWhenCompanionDeactivates() {
         let panel = OverlayPanel(surface: makeSurface(texts: ["首页"]))
 

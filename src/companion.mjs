@@ -47,7 +47,7 @@ export async function buildCompanion({
   await cp(binary, join(contents, 'MacOS', 'ClaudeChineseCompanion'));
   await cp(join(projectDir, 'Sources', 'CompanionCore', 'Resources', 'zh-CN.json'), join(contents, 'Resources', 'zh-CN.json'));
   await cp(ocrDictionaryPath, join(contents, 'Resources', 'ocr-zh-CN.json'));
-  await writeFile(join(contents, 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>CFBundleExecutable</key><string>ClaudeChineseCompanion</string><key>CFBundleIdentifier</key><string>com.kiletry.claude-chinese-companion</string><key>CFBundleName</key><string>Claude 中文伴侣</string><key>CFBundlePackageType</key><string>APPL</string><key>NSScreenCaptureUsageDescription</key><string>仅在 Claude 界面侧栏和工具栏上离线识别英文控件并显示中文覆盖层；不会处理聊天正文或输入框。</string></dict></plist>\n`);
+  await writeFile(join(contents, 'Info.plist'), `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0"><dict><key>CFBundleExecutable</key><string>ClaudeChineseCompanion</string><key>CFBundleIdentifier</key><string>com.kiletry.claude-chinese-companion</string><key>CFBundleName</key><string>Claude 中文伴侣</string><key>CFBundlePackageType</key><string>APPL</string><key>NSAccessibilityUsageDescription</key><string>用于读取 Claude 静态界面控件并显示本地中文覆盖层；不会读取聊天正文或输入框。</string></dict></plist>\n`);
   await execFile('/usr/bin/codesign', [
     '--force', '--sign', '-', '--timestamp=none',
     '--requirements', '=designated => identifier "com.kiletry.claude-chinese-companion"',

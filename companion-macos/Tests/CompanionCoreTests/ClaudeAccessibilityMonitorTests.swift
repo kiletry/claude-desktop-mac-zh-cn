@@ -95,7 +95,6 @@ final class ClaudeAccessibilityMonitorTests: XCTestCase {
                 CGRect(x: 52, y: 514, width: 160, height: 24)
             ]
         )
-        XCTAssertEqual(coordinator.legacyLabelRenderCount, 0)
         XCTAssertEqual(coordinator.clearCount, 0)
     }
 
@@ -155,7 +154,6 @@ final class ClaudeAccessibilityMonitorTests: XCTestCase {
 
         XCTAssertEqual(coordinator.clearCount, 1)
         XCTAssertEqual(coordinator.surfaces.count, 0)
-        XCTAssertEqual(coordinator.legacyLabelRenderCount, 0)
     }
 
     func testOverlayPanelRemainsVisibleWhenCompanionDeactivates() {
@@ -192,15 +190,10 @@ final class ClaudeAccessibilityMonitorTests: XCTestCase {
 @MainActor
 private final class RecordingCoordinator: OverlayRendering {
     private(set) var surfaces: [OverlaySurface] = []
-    private(set) var legacyLabelRenderCount = 0
     private(set) var clearCount = 0
 
     func render(_ surface: OverlaySurface) {
         surfaces.append(surface)
-    }
-
-    func render(_ labels: [OverlayLabel]) {
-        legacyLabelRenderCount += 1
     }
 
     func clear() {

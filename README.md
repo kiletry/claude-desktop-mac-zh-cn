@@ -27,19 +27,19 @@ launch operations require both `codesign --verify --deep --strict` and
 
 `build-companion` reads the installed Claude version, downloads the nearest
 compatible translation data from the credited GitHub project, and pairs it
-with the installed app's English message keys. The resulting OCR dictionary is
+with the installed app's English message keys. The resulting local translation dictionary is
 packaged inside the separate companion application. It makes no runtime
 network requests.
 
-When you turn it on, macOS asks you to allow **Screen Recording** for `Claude
-中文伴侣`. Recognition happens locally with Apple's Vision framework. The
-companion only displays translated overlays in the left 30% of the Claude
-window (sidebar) and top 14% (toolbar). The central chat, prompt box,
-attachments, and transcripts do not receive an overlay. No screen text is
-sent, stored, or translated by a cloud service.
+When you turn it on, macOS asks you to allow **Accessibility** for `Claude
+中文伴侣`. The companion reads only approved static Claude sidebar and toolbar
+control metadata, translates it with the packaged local dictionary, and draws
+one click-through overlay surface. The central chat, prompt box, attachments,
+and transcripts are rejected before text lookup. No interface text is sent,
+stored, or translated by a cloud service.
 
 After building, open the generated `dist/Claude Chinese Companion.app`, grant
-Screen Recording in **System Settings → Privacy & Security → Screen Recording**,
+Accessibility in **系统设置 → 隐私与安全性 → 辅助功能** for **Claude 中文伴侣**,
 then use **Claude 中文 → 启用中文界面** in the macOS menu bar. If Claude is
 updated later, run `./install.sh build-companion` again before launching the
 new companion bundle.

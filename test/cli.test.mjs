@@ -72,7 +72,7 @@ test('localized clone build is retired before it can copy or re-sign Claude', as
   );
 });
 
-test('build companion receives the trusted installed Claude version', async () => {
+test('Accessibility companion build receives the trusted installed Claude version', async () => {
   const trustedApp = {
     bundleId: 'com.anthropic.claudefordesktop',
     version: '1.30096.5',

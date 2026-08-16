@@ -31,8 +31,6 @@ public struct AccessibilitySnapshot: Equatable, Sendable {
 @MainActor
 public protocol OverlayRendering: AnyObject {
     func render(_ surface: OverlaySurface)
-    /// Temporary legacy OCR adapter. Task 5 removes it after its callers migrate.
-    func render(_ labels: [OverlayLabel])
     func clear()
 }
 

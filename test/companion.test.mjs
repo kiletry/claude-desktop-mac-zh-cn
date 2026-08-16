@@ -1,10 +1,26 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 import { buildCompanion, companionAppPath, createOcrTranslationMap } from '../src/companion.mjs';
+
+test('npm package excludes local Swift builds and generated app bundles', () => {
+  const projectRoot = fileURLToPath(new URL('..', import.meta.url));
+  const [{ files }] = JSON.parse(execFileSync(
+    'npm',
+    ['pack', '--dry-run', '--json'],
+    { cwd: projectRoot, encoding: 'utf8' },
+  ));
+  const paths = files.map(({ path }) => path);
+
+  assert.equal(paths.some((path) => path.startsWith('companion-macos/.build/')), false);
+  assert.equal(paths.some((path) => path.startsWith('dist/')), false);
+  assert.equal(paths.some((path) => path.includes('claude-localized-clone')), false);
+});
 
 test('creates OCR translations by matching official message keys', () => {
   assert.deepEqual(
@@ -90,8 +106,15 @@ test('build signs the complete companion bundle with its bundle identity', async
       ],
     },
   ]);
-  const info = await readFile(join(companionAppPath(outputDir), 'Contents', 'Info.plist'), 'utf8');
-  assert.match(info, /NSScreenCaptureUsageDescription/);
+  const codesignArgs = calls[1].args;
+  assert.deepEqual(codesignArgs.slice(-3), [
+    '--requirements',
+    '=designated => identifier "com.kiletry.claude-chinese-companion"',
+    companionAppPath(outputDir),
+  ]);
+  const infoPlist = await readFile(join(companionAppPath(outputDir), 'Contents', 'Info.plist'), 'utf8');
+  assert.doesNotMatch(infoPlist, /NSScreenCaptureUsageDescription/);
+  assert.match(infoPlist, /NSAccessibilityUsageDescription/);
   assert.equal(
     await readFile(join(companionAppPath(outputDir), 'Contents', 'Resources', 'ocr-zh-CN.json'), 'utf8'),
     '{"Settings":"设置"}',

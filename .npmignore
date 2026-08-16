@@ -1,0 +1,9 @@
+.worktrees/
+node_modules/
+coverage/
+companion-macos/.build/
+dist/
+docs/superpowers/plans/2026-08-15-claude-localized-clone.md
+docs/superpowers/specs/2026-08-15-claude-localized-clone-design.md
+*.tgz
+*.tar.gz
