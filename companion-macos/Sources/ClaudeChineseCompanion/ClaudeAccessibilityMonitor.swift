@@ -6,6 +6,18 @@ private let accessibilityDidChangeNotification = Notification.Name(
     "ClaudeAccessibilityMonitorAccessibilityDidChange"
 )
 
+enum AccessibilityCFBridge {
+    static func element(from raw: CFTypeRef?) -> AXUIElement? {
+        guard let raw, CFGetTypeID(raw) == AXUIElementGetTypeID() else { return nil }
+        return (raw as! AXUIElement)
+    }
+
+    static func value(from raw: CFTypeRef?) -> AXValue? {
+        guard let raw, CFGetTypeID(raw) == AXValueGetTypeID() else { return nil }
+        return (raw as! AXValue)
+    }
+}
+
 public struct AccessibilitySnapshot: Equatable, Sendable {
     public let windowID: CGWindowID
     public let windowFrame: CGRect
@@ -380,11 +392,11 @@ public final class ClaudeAccessibilityMonitor {
     }
 
     private static func windowID(of element: AXUIElement) -> CGWindowID? {
-        guard let number = attribute("AXWindowNumber", from: element) as? NSNumber else { return nil }
+        guard let number = rawAttribute("AXWindowNumber", from: element) as? NSNumber else { return nil }
         return CGWindowID(number.uint32Value)
     }
 
-    private static func attribute(_ key: String, from element: AXUIElement) -> Any? {
+    private static func rawAttribute(_ key: String, from element: AXUIElement) -> CFTypeRef? {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, key as CFString, &value) == .success else {
             return nil
@@ -393,26 +405,24 @@ public final class ClaudeAccessibilityMonitor {
     }
 
     private static func stringAttribute(_ key: String, from element: AXUIElement) -> String? {
-        attribute(key, from: element) as? String
+        rawAttribute(key, from: element) as? String
     }
 
     private static func boolAttribute(_ key: String, from element: AXUIElement) -> Bool? {
-        guard let number = attribute(key, from: element) as? NSNumber else { return nil }
+        guard let number = rawAttribute(key, from: element) as? NSNumber else { return nil }
         return number.boolValue
     }
 
     private static func childrenAttribute(_ key: String, from element: AXUIElement) -> [AXUIElement] {
-        attribute(key, from: element) as? [AXUIElement] ?? []
+        rawAttribute(key, from: element) as? [AXUIElement] ?? []
     }
 
     private static func elementAttribute(_ key: String, from element: AXUIElement) -> AXUIElement? {
-        guard let value = attribute(key, from: element) else { return nil }
-        return unsafeBitCast(value, to: AXUIElement.self)
+        AccessibilityCFBridge.element(from: rawAttribute(key, from: element))
     }
 
     private static func axValueAttribute(_ key: String, from element: AXUIElement) -> AXValue? {
-        guard let value = attribute(key, from: element) else { return nil }
-        return unsafeBitCast(value, to: AXValue.self)
+        AccessibilityCFBridge.value(from: rawAttribute(key, from: element))
     }
 
     private static func frame(of element: AXUIElement) -> CGRect? {

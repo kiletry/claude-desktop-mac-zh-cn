@@ -1,3 +1,4 @@
+import ApplicationServices
 import CoreGraphics
 import XCTest
 @testable import ClaudeChineseCompanion
@@ -8,6 +9,17 @@ final class ClaudeAccessibilityMonitorTests: XCTestCase {
     private var fixtureDictionary: TranslationDictionary {
         let fixtureURL = Bundle.module.url(forResource: "fixture", withExtension: "json")!
         return try! TranslationDictionary(resourceURL: fixtureURL)
+    }
+
+    func testAccessibilityCFBridgeConvertsMatchingTypesAndRejectsMismatches() throws {
+        let element: CFTypeRef = AXUIElementCreateSystemWide()
+        var point = CGPoint(x: 12, y: 34)
+        let value: CFTypeRef = try XCTUnwrap(AXValueCreate(.cgPoint, &point))
+
+        XCTAssertNotNil(AccessibilityCFBridge.element(from: element))
+        XCTAssertNotNil(AccessibilityCFBridge.value(from: value))
+        XCTAssertNil(AccessibilityCFBridge.element(from: value))
+        XCTAssertNil(AccessibilityCFBridge.value(from: element))
     }
 
     func testRefreshRendersKnownSidebarControlsAndRejectsConversationContent() {
