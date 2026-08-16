@@ -124,8 +124,63 @@ let chinesePatch = OverlayLayout.patch(
 )
 precondition(chinesePatch?.frame.minX == 44)
 precondition(chinesePatch?.frame.maxX ?? .infinity <= 214)
+precondition(chinesePatch?.frame.height ?? 0 > 0)
 precondition(OverlayLayout.patch(
     controlFrame: CGRect(x: 12, y: 20, width: 90, height: 28),
     text: "筛选并分组最近记录",
     isEnabled: true
+) == nil)
+precondition(OverlayLayout.patch(
+    controlFrame: CGRect(x: 12, y: 20, width: 210, height: 16),
+    text: "项目",
+    isEnabled: true
+) == nil)
+precondition(OverlayLayout.patch(
+    controlFrame: CGRect(x: 12, y: 20, width: 210, height: -28),
+    text: "项目",
+    isEnabled: true
+) == nil)
+
+let surfaceControl = AccessibilityElement(
+    role: "AXButton",
+    title: "Projects",
+    value: nil,
+    identifier: "sidebar-projects",
+    isEnabled: true,
+    parentRole: "AXGroup",
+    ancestorRoles: ["AXWindow", "AXGroup"],
+    frame: CGRect(x: 120, y: 230, width: 210, height: 28)
+)
+let overlaySurface = OverlayLayout.surface(
+    windowID: 42,
+    windowFrame: CGRect(x: 100, y: 200, width: 400, height: 300),
+    display: primaryDisplay,
+    appearance: .dark,
+    translations: [(surfaceControl, "项目")]
+)
+precondition(overlaySurface?.patches.first?.frame == CGRect(x: 52, y: 244, width: 170, height: 24))
+
+let outsideSurfaceControl = AccessibilityElement(
+    role: "AXButton",
+    title: "Projects",
+    value: nil,
+    identifier: "sidebar-projects",
+    isEnabled: true,
+    parentRole: "AXGroup",
+    ancestorRoles: ["AXWindow", "AXGroup"],
+    frame: CGRect(x: 20, y: 230, width: 210, height: 28)
+)
+precondition(OverlayLayout.surface(
+    windowID: 42,
+    windowFrame: CGRect(x: 100, y: 200, width: 400, height: 300),
+    display: primaryDisplay,
+    appearance: .dark,
+    translations: [(outsideSurfaceControl, "项目")]
+) == nil)
+precondition(OverlayLayout.surface(
+    windowID: 42,
+    windowFrame: CGRect(x: 100, y: 200, width: 400, height: 300),
+    display: primaryDisplay,
+    appearance: .dark,
+    translations: []
 ) == nil)

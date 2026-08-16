@@ -1,6 +1,7 @@
 import CoreGraphics
 import CoreText
 import Foundation
+import AppKit
 
 // Retained while the current app target still renders legacy OCR labels.
 public struct OverlayLabel: Equatable, Sendable {
@@ -21,15 +22,22 @@ public enum OverlayLayout {
     private static let gap: CGFloat = 6
 
     public static func patch(controlFrame: CGRect, text: String, isEnabled: Bool) -> OverlayPatch? {
-        guard !text.isEmpty, !controlFrame.isEmpty else { return nil }
-        guard let font = CTFontCreateUIFontForLanguage(.system, 13, nil) else { return nil }
+        guard !text.isEmpty,
+              controlFrame.size.width > 0,
+              controlFrame.size.height > 0 else { return nil }
+        let appKitFont = NSFont.systemFont(ofSize: 13, weight: .medium)
+        let font = CTFontCreateWithName(appKitFont.fontName as CFString, appKitFont.pointSize, nil)
 
         let attributed = NSAttributedString(
             string: text,
             attributes: [kCTFontAttributeName as NSAttributedString.Key: font]
         )
         let line = CTLineCreateWithAttributedString(attributed)
-        let measuredWidth = ceil(CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))) + 4
+        var ascent: CGFloat = 0
+        var descent: CGFloat = 0
+        var leading: CGFloat = 0
+        let measuredWidth = ceil(CGFloat(CTLineGetTypographicBounds(line, &ascent, &descent, &leading))) + 4
+        let measuredHeight = ceil(ascent + descent + leading)
         let textFrame = CGRect(
             x: controlFrame.minX + 32,
             y: controlFrame.minY + 2,
@@ -38,7 +46,9 @@ public enum OverlayLayout {
         )
 
         guard textFrame.width >= 40,
+              textFrame.height > 0,
               measuredWidth <= textFrame.width,
+              measuredHeight <= textFrame.height,
               textFrame.minX >= controlFrame.minX,
               textFrame.maxX <= controlFrame.maxX - 8,
               textFrame.minY >= controlFrame.minY,
