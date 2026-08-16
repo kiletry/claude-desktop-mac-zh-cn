@@ -1,1 +1,5 @@
-[{"source":"Settings","role":"AXButton","parentRole":"AXToolbar","target":"设置"}]
+[
+  {"source":"Settings","role":"AXButton","parentRole":"AXToolbar","target":"设置"},
+  {"source":"Projects","role":"AXButton","parentRole":"AXGroup","target":"项目"},
+  {"source":"New","role":"AXButton","parentRole":"AXGroup","target":"新建"}
+]

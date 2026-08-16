@@ -1,5 +1,6 @@
 import CompanionCore
 import CoreGraphics
+import Foundation
 
 let window = CGRect(x: 100, y: 200, width: 1_000, height: 700)
 let screen = CGRect(x: 0, y: 0, width: 1_440, height: 900)
@@ -184,3 +185,19 @@ precondition(OverlayLayout.surface(
     appearance: .dark,
     translations: []
 ) == nil)
+
+let fixtureEntries = """
+[
+  {"source":"Projects","role":"AXButton","parentRole":"AXGroup","target":"项目"},
+  {"source":"New","role":"AXButton","parentRole":"AXGroup","target":"新建"}
+]
+""".data(using: .utf8)!
+let fixtureURL = FileManager.default.temporaryDirectory
+    .appendingPathComponent("claude-accessibility-task-4-fixture-\(UUID().uuidString).json")
+try fixtureEntries.write(to: fixtureURL)
+defer { try? FileManager.default.removeItem(at: fixtureURL) }
+
+let fixtureDictionary = try TranslationDictionary(resourceURL: fixtureURL)
+precondition(fixtureDictionary.translation(forVisibleText: "Projects") == "项目")
+precondition(fixtureDictionary.translation(forVisibleText: "New") == "新建")
+precondition(fixtureDictionary.translation(forVisibleText: "private prompt") == nil)

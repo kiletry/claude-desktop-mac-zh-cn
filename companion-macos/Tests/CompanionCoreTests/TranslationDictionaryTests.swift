@@ -20,4 +20,13 @@ final class TranslationDictionaryTests: XCTestCase {
         XCTAssertEqual(dictionary.translation(forVisibleText: "+ New"), "新建")
         XCTAssertNil(dictionary.translation(forVisibleText: "A chat response must remain untranslated"))
     }
+
+    func testFixtureExposesOnlyKnownStaticControlCopyForVisibleTextLookup() throws {
+        let fixtureURL = try XCTUnwrap(Bundle.module.url(forResource: "fixture", withExtension: "json"))
+        let dictionary = try TranslationDictionary(resourceURL: fixtureURL)
+
+        XCTAssertEqual(dictionary.translation(forVisibleText: "Projects"), "项目")
+        XCTAssertEqual(dictionary.translation(forVisibleText: "New"), "新建")
+        XCTAssertNil(dictionary.translation(forVisibleText: "My private project"))
+    }
 }
