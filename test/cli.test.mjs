@@ -62,14 +62,77 @@ test('companion operation failure still performs the post-operation assessment',
   assert.equal(inspections, 2);
 });
 
-test('localized clone build is retired before it can copy or re-sign Claude', async () => {
-  await assert.rejects(
-    runCli(['build-localized-clone'], {
-      inspectClaudeApp: async () => { throw new Error('must not inspect or copy'); },
-      buildLocalizedClone: async () => { throw new Error('must not copy or re-sign'); },
-    }),
-    (error) => error instanceof UserError && /retired.*companion/i.test(error.message),
-  );
+test('localized clone build validates the official app before and after clone construction', async () => {
+  let inspections = 0;
+  const builds = [];
+  const output = [];
+  const trustedApp = {
+    bundleId: 'com.anthropic.claudefordesktop',
+    version: '1.30096.5',
+    signing: { verified: true },
+    gatekeeper: { accepted: true },
+  };
+
+  await runCli(['build-localized-clone', '--app-dir', '/fixture/Claude.app', '--output-dir', '/fixture/output', '--replace'], {
+    inspectClaudeApp: async () => {
+      inspections += 1;
+      return trustedApp;
+    },
+    buildLocalizedClone: async (options) => {
+      builds.push(options);
+      return {
+        appPath: '/fixture/output/Claude 中文.app',
+        translationVersion: '1.30096.1.0',
+        sourceCommit: 'commit-sha',
+      };
+    },
+    writeJson: (value) => output.push(value),
+  });
+
+  assert.equal(inspections, 2);
+  assert.deepEqual(builds, [{
+    appDir: '/fixture/Claude.app',
+    version: '1.30096.5',
+    outputDir: '/fixture/output',
+    replace: true,
+  }]);
+  assert.deepEqual(output, [{
+    appPath: '/fixture/output/Claude 中文.app',
+    translationVersion: '1.30096.1.0',
+    sourceCommit: 'commit-sha',
+  }]);
+});
+
+test('generate is the public Claude.app to Claude Chinese.app generator command', async () => {
+  const builds = [];
+  const output = [];
+  const trustedApp = {
+    bundleId: 'com.anthropic.claudefordesktop',
+    version: '1.30096.5',
+    signing: { verified: true },
+    gatekeeper: { accepted: true },
+  };
+
+  await runCli(['generate', '--app-dir', '/fixture/Claude.app', '--output-dir', '/fixture/output', '--replace'], {
+    inspectClaudeApp: async () => trustedApp,
+    buildLocalizedClone: async (options) => {
+      builds.push(options);
+      return { appPath: '/fixture/output/Claude 中文.app', translationVersion: '1.30096.1.0', sourceCommit: 'commit-sha' };
+    },
+    writeJson: (value) => output.push(value),
+  });
+
+  assert.deepEqual(builds, [{
+    appDir: '/fixture/Claude.app',
+    version: '1.30096.5',
+    outputDir: '/fixture/output',
+    replace: true,
+  }]);
+  assert.deepEqual(output, [{
+    appPath: '/fixture/output/Claude 中文.app',
+    translationVersion: '1.30096.1.0',
+    sourceCommit: 'commit-sha',
+  }]);
 });
 
 test('Accessibility companion build receives the trusted installed Claude version', async () => {

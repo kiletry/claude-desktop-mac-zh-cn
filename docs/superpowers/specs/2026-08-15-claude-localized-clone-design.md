@@ -41,9 +41,12 @@ its signature, its permissions, or its user data.
 - The translation source is selected by version, not by an arbitrary download.
 - Locale JavaScript is patched only when the exact known locale array occurs
   exactly once; otherwise the copied bundle is discarded and the command fails.
-- `CFBundleDisplayName` and `CFBundleName` are changed only in the copied
-  `Info.plist`; the official bundle identifier and executable names remain
-  unchanged so Electron helper discovery continues to work.
+- `CFBundleDisplayName` and a stable independent bundle identifier
+  (`com.kiletry.claude-desktop-zh-cn`) are changed only in the copied
+  `Info.plist`; the internal `CFBundleName` remains `Claude` and executable
+  names remain unchanged because Electron derives helper paths from that
+  internal name. A distinct identifier is required because LaunchServices
+  otherwise routes the copied path back to the official app.
 - `codesign --verify --deep --strict` must pass for the clone. The official
   application is checked before and after clone construction.
 - The installer does not call `xattr`, disable Gatekeeper, or modify the

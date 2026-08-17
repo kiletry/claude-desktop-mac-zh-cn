@@ -1,6 +1,7 @@
 import { CompatibilityError, UserError } from './errors.mjs';
 import { inspectClaudeApp } from './claude-inspector.mjs';
 import { buildCompanion, launchCompanion } from './companion.mjs';
+import { buildLocalizedClone } from './localized-clone.mjs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -8,11 +9,13 @@ const HELP = `Usage: claude-desktop-mac-zh-cn <command>
 
 Commands:
   status            Inspect the official Claude Desktop installation
+  generate          Generate Claude 中文.app from the official Claude.app
   build-companion   Build the separate offline companion
-  launch-companion  Launch the separate offline companion`;
+  launch-companion  Launch the separate offline companion
+  build-localized-clone  Build an independently signed Chinese Claude copy`;
 
-const COMMANDS = new Set(['status', 'build-companion', 'launch-companion']);
-const RETIRED_COMMANDS = new Set(['install', 'update', 'restore', 'build-localized-clone']);
+const COMMANDS = new Set(['status', 'generate', 'build-companion', 'launch-companion', 'build-localized-clone']);
+const RETIRED_COMMANDS = new Set(['install', 'update', 'restore']);
 
 export async function runCli(argv, dependencies = {}) {
   const write = dependencies.write ?? console.log;
@@ -42,16 +45,25 @@ export async function runCli(argv, dependencies = {}) {
 
   assertTrustedClaude(app);
   const projectDir = dependencies.projectDir ?? join(process.cwd(), 'companion-macos');
-  const outputDir = dependencies.outputDir ?? join(projectDir, '..', 'dist');
+  const companionOutputDir = dependencies.outputDir ?? join(projectDir, '..', 'dist');
+  const cloneOutputDir = options.outputDir ?? '/Applications';
+  const isCloneCommand = command === 'generate' || command === 'build-localized-clone';
   const operation = command === 'build-companion'
-    ? () => (dependencies.buildCompanion ?? buildCompanion)({ appDir, version: app.version, projectDir, outputDir })
-    : (dependencies.launchCompanion ?? (() => launchCompanion({ appPath: join(outputDir, 'Claude Chinese Companion.app') })));
+    ? () => (dependencies.buildCompanion ?? buildCompanion)({ appDir, version: app.version, projectDir, outputDir: companionOutputDir })
+    : isCloneCommand
+      ? () => (dependencies.buildLocalizedClone ?? buildLocalizedClone)({
+        appDir,
+        version: app.version,
+        outputDir: cloneOutputDir,
+        replace: options.replace === true,
+      })
+      : (dependencies.launchCompanion ?? (() => launchCompanion({ appPath: join(companionOutputDir, 'Claude Chinese Companion.app') })));
   if (typeof operation !== 'function') {
     throw new UserError(`${command} is not available until the offline companion is installed.`);
   }
   try {
     const result = await operation();
-    if (command === 'build-companion' && result) {
+    if ((command === 'build-companion' || isCloneCommand) && result) {
       output({
         appPath: result.appPath,
         translationVersion: result.translationVersion,
@@ -66,7 +78,7 @@ export async function runCli(argv, dependencies = {}) {
 
 function assertTrustedClaude(app) {
   if (!app.signing?.verified || !app.gatekeeper?.accepted) {
-    throw new CompatibilityError('Claude.app must pass codesign and Gatekeeper assessment before companion operations.');
+    throw new CompatibilityError('Claude.app must pass codesign and Gatekeeper assessment before generation.');
   }
 }
 
@@ -75,6 +87,8 @@ function parseOptions(args) {
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === '--app-dir') options.appDir = args[++index];
+    else if (arg === '--output-dir') options.outputDir = args[++index];
+    else if (arg === '--replace') options.replace = true;
     else throw new UserError(`Unknown option: ${arg}`);
   }
   return options;
