@@ -19,11 +19,38 @@ async function makeApp() {
 test('inspects required resource directories and version', async () => {
   const appDir = await makeApp();
   const info = await inspectClaudeApp(appDir, {
-    execFile: async () => ({ stdout: JSON.stringify({ CFBundleShortVersionString: '1.25927.0' }), stderr: '' }),
+    execFile: async () => ({
+      stdout: JSON.stringify({
+        CFBundleIdentifier: 'com.anthropic.claudefordesktop',
+        CFBundleShortVersionString: '1.25927.0',
+      }),
+      stderr: '',
+    }),
   });
   assert.equal(info.version, '1.25927.0');
   assert.equal(info.layout.i18nDir.endsWith('/ion-dist/i18n'), true);
   assert.equal(info.layout.assetsDir.endsWith('/ion-dist/assets/v1'), true);
+});
+
+test('reports official bundle and Gatekeeper assessment', async () => {
+  const appDir = await makeApp();
+  const fakeMacCommand = async (file) => {
+    if (file === '/usr/bin/plutil') {
+      return {
+        stdout: JSON.stringify({
+          CFBundleIdentifier: 'com.anthropic.claudefordesktop',
+          CFBundleShortVersionString: '1.25927.0',
+        }),
+        stderr: '',
+      };
+    }
+    return { stdout: '', stderr: '' };
+  };
+
+  const result = await inspectClaudeApp(appDir, { execFile: fakeMacCommand });
+  assert.equal(result.bundleId, 'com.anthropic.claudefordesktop');
+  assert.equal(result.signing.verified, true);
+  assert.equal(result.gatekeeper.accepted, true);
 });
 
 test('rejects an explicit invalid app directory', async () => {

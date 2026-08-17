@@ -3,6 +3,8 @@ import { join } from 'node:path';
 
 import { CompatibilityError } from './errors.mjs';
 
+const OFFICIAL_BUNDLE_ID = 'com.anthropic.claudefordesktop';
+
 const defaultExecFile = async (file, args) => {
   const { execFile } = await import('node:child_process');
   return new Promise((resolve, reject) => execFile(file, args, { encoding: 'utf8' }, (error, stdout, stderr) => {
@@ -36,6 +38,10 @@ export async function inspectClaudeApp(appDir, { execFile = defaultExecFile } = 
   }
   const version = info.CFBundleShortVersionString;
   if (typeof version !== 'string') throw new CompatibilityError('Claude Info.plist has no application version');
+  const bundleId = info.CFBundleIdentifier;
+  if (bundleId !== OFFICIAL_BUNDLE_ID) {
+    throw new CompatibilityError(`Unsupported Claude bundle identifier: ${String(bundleId)}`);
+  }
   let signing = { verified: false, output: '' };
   try {
     const result = await execFile('/usr/bin/codesign', ['--verify', '--deep', '--strict', appDir]);
@@ -43,10 +49,18 @@ export async function inspectClaudeApp(appDir, { execFile = defaultExecFile } = 
   } catch (error) {
     signing = { verified: false, output: error.stderr ?? error.message ?? '' };
   }
+  let gatekeeper = { accepted: false, output: '' };
+  try {
+    const result = await execFile('/usr/sbin/spctl', ['--assess', '--type', 'execute', '--verbose=2', appDir]);
+    gatekeeper = { accepted: true, output: result.stderr ?? result.stdout ?? '' };
+  } catch (error) {
+    gatekeeper = { accepted: false, output: error.stderr ?? error.message ?? '' };
+  }
   const dynamicDir = join(i18nDir, 'dynamic');
   const desktopShellDir = join(resourcesDir, 'desktop-shell', 'i18n');
   return {
     appDir,
+    bundleId,
     resourcesDir,
     version,
     layout: {
@@ -56,5 +70,6 @@ export async function inspectClaudeApp(appDir, { execFile = defaultExecFile } = 
       desktopShellDir: await exists(desktopShellDir) ? desktopShellDir : null,
     },
     signing,
+    gatekeeper,
   };
 }

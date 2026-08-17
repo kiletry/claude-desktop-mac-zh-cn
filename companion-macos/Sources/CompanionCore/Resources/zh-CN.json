@@ -1,0 +1,10 @@
+[
+  {"source":"Settings","role":"AXButton","parentRole":"AXToolbar","target":"设置"},
+  {"source":"Preferences","role":"AXMenuItem","parentRole":"AXMenu","target":"偏好设置"},
+  {"source":"Account","role":"AXMenuItem","parentRole":"AXMenu","target":"账户"},
+  {"source":"Sign out","role":"AXMenuItem","parentRole":"AXMenu","target":"退出登录"},
+  {"source":"Help","role":"AXMenuItem","parentRole":"AXMenu","target":"帮助"},
+  {"source":"Back","role":"AXButton","parentRole":"AXToolbar","target":"返回"},
+  {"source":"Forward","role":"AXButton","parentRole":"AXToolbar","target":"前进"},
+  {"source":"New conversation","role":"AXButton","parentRole":"AXToolbar","target":"新建对话"}
+]

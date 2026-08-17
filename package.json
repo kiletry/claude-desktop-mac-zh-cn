@@ -6,6 +6,9 @@
   "engines": {
     "node": ">=18"
   },
+  "dependencies": {
+    "@electron/asar": "^4.2.1"
+  },
   "bin": {
     "claude-desktop-mac-zh-cn": "./bin/claude-desktop-mac-zh-cn.mjs"
   },
