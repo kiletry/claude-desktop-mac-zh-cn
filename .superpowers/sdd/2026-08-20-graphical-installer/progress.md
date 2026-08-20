@@ -19,3 +19,5 @@ Task 6: complete — commit 7d02be3. Added clean-machine verification, disposabl
 Final review fixes: commits 32a8814 and 40f43ef. Replaced runtime `npx @electron/asar` calls with the embedded `@electron/asar` library, synchronized App version with package version, added Bundle ID and Cockpit/CC Switch guidance to the GUI, and made the release workflow run clean-check plus publish SHA256SUMS. E2E fixture now includes packaged dependencies. Node suite remains 63/63; Swift release build passes.
 
 Additional clean-check fix: commit 07ac96e. The clean acceptance now runs from its disposable directory with absolute embedded paths, so it does not depend on the caller's working directory. Real local packaged App verification and `Quality gate passed` both pass.
+
+Claude 1.32885.1 compatibility fixes: commits 735b8b2 and b2fdf7f. The generator now recognizes the renamed `vv` locale registry and automatically locates the hashed runtime chunk, including the newer `u5e/d5e` locale functions. Full Node suite passes 66/66; regenerated DMG passes bundle verification and clean-check.
