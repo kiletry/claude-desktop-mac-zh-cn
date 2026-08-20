@@ -147,6 +147,25 @@ npm test
 npm run package
 ```
 
+### 构建图形化安装包（开发者）
+
+图形化生成器会内置 arm64 与 x86_64 两个 Node 运行时，因此最终用户无需自行安装
+Node.js。将两个已解压且可执行的 Node 二进制文件放在同一目录后构建：
+
+```bash
+npm run build:generator -- \
+  --runtime-dir "$NODE_RUNTIME_DIR" \
+  --output-dir 'dist/Claude 中文生成器.app'
+npm run build:dmg -- \
+  --app 'dist/Claude 中文生成器.app' \
+  --output 'dist/Claude 中文生成器-macOS.dmg'
+npm run verify:generator-bundle -- 'dist/Claude 中文生成器.app'
+```
+
+`$NODE_RUNTIME_DIR` 必须包含 `node-arm64` 和 `node-x64`。DMG 仅包含
+`Claude 中文生成器.app` 及指向 `/Applications` 的拖拽别名；不会包含、复制或修改
+官方 `Claude.app` 或生成的 `Claude 中文.app`。
+
 真实生成命令只写入独立副本：
 
 ```bash

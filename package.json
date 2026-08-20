@@ -13,7 +13,10 @@
     "claude-desktop-mac-zh-cn": "./bin/claude-desktop-mac-zh-cn.mjs"
   },
   "scripts": {
+    "build:generator": "node scripts/build-generator-app.mjs",
+    "build:dmg": "scripts/build-dmg.sh",
     "test": "node --test",
+    "verify:generator-bundle": "scripts/verify-generator-bundle.sh",
     "package": "npm pack --dry-run"
   }
 }
