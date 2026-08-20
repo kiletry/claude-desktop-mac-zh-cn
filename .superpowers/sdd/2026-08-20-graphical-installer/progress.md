@@ -15,3 +15,5 @@ Task 4: implementation complete — commit bfaa80a; safety follow-up commit 3f14
 Task 5: complete — commit 8663b1d. Added pinned Node runtime downloads and SHA-256 checks, universal Swift build, DMG/CLI artifact publication, release notes, GUI guide, and release-manifest tests. Release-manifest 2/2 and full Node suite 62/62 pass; full Swift XCTest/universal build is reserved for GitHub macOS with Xcode.
 
 Task 6: complete — commit 7d02be3. Added clean-machine verification, disposable HOME/official-fixture integrity checks, `Quality gate passed` evidence, and final release acceptance documentation. E2E clean-check passes with exit code 0; package-lock.json remains user-owned and untracked.
+
+Final review fixes: commits 32a8814 and 40f43ef. Replaced runtime `npx @electron/asar` calls with the embedded `@electron/asar` library, synchronized App version with package version, added Bundle ID and Cockpit/CC Switch guidance to the GUI, and made the release workflow run clean-check plus publish SHA256SUMS. E2E fixture now includes packaged dependencies. Node suite remains 63/63; Swift release build passes.
