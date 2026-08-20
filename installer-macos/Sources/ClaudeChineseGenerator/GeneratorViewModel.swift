@@ -13,6 +13,8 @@ final class GeneratorViewModel: ObservableObject {
     private var latestLogURL: URL?
     private var completionSummary: ResultSummary?
     private var lastTrustedInspection: Inspection?
+    private var generationTask: Task<Void, Never>?
+    private var cancellationRequested = false
 
     init(
         bridge: GeneratorProcessRunning = NodeProcessBridge(executableURL: NodeProcessBridge.bundledNodeURL),
@@ -54,18 +56,27 @@ final class GeneratorViewModel: ObservableObject {
     }
 
     func confirmAndGenerate() async {
-        if case .confirmingReplacement = state {
-            await generate()
+        guard lastTrustedInspection != nil else { return }
+        let replacementConfirmed: Bool
+        switch state {
+        case .ready:
+            replacementConfirmed = false
+        case .confirmingReplacement:
+            replacementConfirmed = true
+        default:
             return
         }
-        if FileManager.default.fileExists(atPath: outputAppURL.path) {
+        if !replacementConfirmed && FileManager.default.fileExists(atPath: outputAppURL.path) {
             state = .confirmingReplacement
             return
         }
-        await generate()
+        await runGenerationTask()
     }
 
     func cancelGeneration() {
+        guard case .generating = state else { return }
+        cancellationRequested = true
+        generationTask?.cancel()
         bridge.cancel()
         state = .failed(GeneratorError(message: "生成已取消。", details: "子进程已终止。", logURL: latestLogURL))
     }
@@ -92,6 +103,7 @@ final class GeneratorViewModel: ObservableObject {
     }
 
     private func generate() async {
+        cancellationRequested = false
         state = .generating(Progress(stage: "generation", message: "正在生成中文副本…"))
         completionSummary = nil
         do {
@@ -118,6 +130,17 @@ final class GeneratorViewModel: ObservableObject {
         }
     }
 
+    private func runGenerationTask() async {
+        guard generationTask == nil else { return }
+        let task: Task<Void, Never> = Task { [weak self] in
+            guard let self else { return }
+            await self.generate()
+        }
+        generationTask = task
+        await task.value
+        generationTask = nil
+    }
+
     private func handle(event: GeneratorEvent) {
         switch event.event {
         case "stage_started", "stage_succeeded":
@@ -135,6 +158,9 @@ final class GeneratorViewModel: ObservableObject {
     }
 
     private func failureState(from error: Error) -> GeneratorState {
+        if cancellationRequested {
+            return .failed(GeneratorError(message: "生成已取消。", details: "子进程已终止。", logURL: latestLogURL))
+        }
         switch error {
         case let NodeProcessBridgeError.nonZeroExit(result):
             latestLogURL = result.logURL

@@ -62,7 +62,7 @@ struct Inspection: Equatable, Sendable {
 
     var isTrustedOfficialApp: Bool {
         appDirectory == "/Applications/Claude.app"
-            && bundleIdentifier == "com.anthropic.claude"
+            && bundleIdentifier == "com.anthropic.claudefordesktop"
             && signingVerified
             && gatekeeperAccepted
     }

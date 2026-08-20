@@ -94,8 +94,11 @@ private struct GeneratorWindow: View {
     private var actionArea: some View {
         HStack {
             switch viewModel.state {
-            case .ready, .confirmingReplacement, .failed:
+            case .ready, .confirmingReplacement:
                 Button("生成/更新中文副本") { Task { await viewModel.confirmAndGenerate() } }
+                    .buttonStyle(.borderedProminent)
+            case .failed:
+                Button("重新检查官方 Claude") { Task { await viewModel.check() } }
                     .buttonStyle(.borderedProminent)
             case .generating:
                 Button("取消生成", role: .destructive) { viewModel.cancelGeneration() }
