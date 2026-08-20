@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-  print -u2 -- "Usage: verify-generator-bundle.sh '/path/Claude 中文生成器.app'"
+  print -u2 -- "Usage: verify-generator-bundle.sh [--clean-check] '/path/Claude 中文生成器.app'"
   exit 64
 }
 
@@ -10,6 +10,12 @@ fail() {
   print -u2 -- "$1"
   exit 1
 }
+
+clean_check=false
+if [[ "${1:-}" == '--clean-check' ]]; then
+  clean_check=true
+  shift
+fi
 
 (( $# == 1 )) || usage
 app_path="$1"
@@ -52,3 +58,47 @@ esac
 "$node" "$cli" --help >/dev/null || fail "Embedded CLI help command failed"
 
 print -- "Verified generator bundle: $app_path"
+
+if [[ "$clean_check" == true ]]; then
+  clean_root="$(mktemp -d "${TMPDIR:-/tmp}/claude-generator-clean-check.XXXXXX")"
+  trap 'rm -rf "$clean_root"' EXIT
+  clean_home="$clean_root/home"
+  clean_output="$clean_root/output"
+  official_app="${VERIFY_GENERATOR_CLEAN_APP_DIR:-$clean_root/Claude.app}"
+  mkdir -p "$clean_home" "$clean_output"
+
+  if [[ -z "${VERIFY_GENERATOR_CLEAN_APP_DIR:-}" ]]; then
+    mkdir -p "$official_app/Contents/Resources/ion-dist/i18n"
+    cat > "$official_app/Contents/Info.plist" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>com.anthropic.claudefordesktop</string>
+<key>CFBundleShortVersionString</key><string>clean-check-fixture</string>
+</dict></plist>
+EOF
+  fi
+
+  [[ -d "$official_app" ]] || fail "Clean-check official app fixture does not exist: $official_app"
+  before_snapshot="$clean_root/official-before.sha256"
+  after_snapshot="$clean_root/official-after.sha256"
+  find "$official_app" -xdev -type f -exec shasum -a 256 {} + | LC_ALL=C sort > "$before_snapshot"
+
+  clean_env=(HOME="$clean_home" TMPDIR="$clean_root/tmp" PATH='/usr/bin:/bin:/usr/sbin:/sbin')
+  if [[ -n "${CLEAN_CHECK_HOST_NODE:-}" ]]; then
+    # Test fixtures may use a tiny embedded-runtime launcher; release bundles never need this.
+    clean_env+=(CLEAN_CHECK_HOST_NODE="$CLEAN_CHECK_HOST_NODE")
+  fi
+  mkdir -p "$clean_root/tmp"
+  (
+    cd "$runtime/package"
+    env -i "${clean_env[@]}" "$node" "$cli" status --app-dir "$official_app" >/dev/null
+  ) || fail "Embedded CLI status path failed during clean-machine check"
+
+  find "$official_app" -xdev -type f -exec shasum -a 256 {} + | LC_ALL=C sort > "$after_snapshot"
+  cmp -s "$before_snapshot" "$after_snapshot" || fail "Clean check detected a write under the official Claude fixture"
+  [[ -z "$(find "$clean_output" -mindepth 1 -print -quit)" ]] || fail "Clean check unexpectedly created clone output"
+
+  print -- "Verified embedded CLI status path without host Node or project files"
+  print -- "Quality gate passed"
+fi

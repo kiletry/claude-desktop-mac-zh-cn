@@ -102,3 +102,21 @@ open "/Applications/Claude 中文.app"
 ```
 
 CLI 与图形化生成器遵循相同边界：只读检查官方 Claude，只生成并临时签名独立中文副本。
+
+## 发布验收与版本说明
+
+每个正式版本在发布前都会运行“清洁机器”验收：生成器仅使用 App 内置的 Node
+运行时和随 App 打包的 CLI，在临时用户目录中执行一次官方 Claude 状态检查。该检查记录
+命令退出码，并且只有日志出现 `Quality gate passed` 且退出码为 `0` 时，才允许发布 DMG。
+检查会在前后比较官方 Claude fixture 的文件摘要，任何写入都会使验收失败。
+
+Release 附带以下文件及校验信息：
+
+- `Claude 中文生成器-…-macOS.dmg`：图形化生成器，内置 Apple Silicon（arm64）和 Intel
+  （x64）两种 Node 运行时。
+- `claude-desktop-mac-zh-cn-… .tgz`：保留给熟悉终端的用户的 CLI 包。
+- 每个发布文件的 SHA-256 校验值；下载后应先核对校验值，再按本页的首次安装步骤打开。
+
+DMG 首次打开仍可能触发 macOS 的来源确认。该确认不代表官方 Claude 已被改动；生成器
+和生成出的中文副本都不具备 Anthropic 的官方签名。请特别留意前文所述的临时签名、3P /
+Cowork 与官方安装校验限制。
