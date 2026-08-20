@@ -20,6 +20,8 @@ test('release workflow verifies pinned Node runtimes and publishes exactly one D
   assert.match(workflow, /shasum -a 256 -c/);
   assert.match(workflow, /npm test/);
   assert.match(workflow, /verify:generator-bundle/);
+  assert.match(workflow, /--clean-check/);
+  assert.match(workflow, /SHA256SUMS/);
   const cliPackageIndex = workflow.indexOf('npm pack --pack-destination dist/release');
   const appBuildIndex = workflow.indexOf('npm run build:generator');
   assert.ok(cliPackageIndex >= 0 && cliPackageIndex < appBuildIndex, 'CLI tgz is packed before generated app and DMG artifacts exist');
