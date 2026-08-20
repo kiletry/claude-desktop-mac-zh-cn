@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { chmod, mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -31,6 +31,48 @@ test('DMG builder requires an existing generator app', () => {
   const result = run(dmgBuilder, ['--app', '/tmp/not-a-generator.app', '--output', '/tmp/ignored.dmg']);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /generator app does not exist/i);
+});
+
+test('DMG builder rejects a generator-named symlink before signing its Claude target', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'claude-dmg-symlink-'));
+  const officialApp = join(root, 'Claude.app');
+  const disguisedApp = join(root, 'Claude 中文生成器.app');
+  const output = join(root, 'Claude 中文生成器-macOS.dmg');
+  const codesignMarker = join(root, 'codesign-was-called');
+  const codesign = join(root, 'fake-codesign');
+  await mkdir(officialApp);
+  await symlink(officialApp, disguisedApp);
+  await writeFile(codesign, `#!/bin/sh\ntouch "$CODESIGN_MARKER"\n`);
+  await chmod(codesign, 0o755);
+
+  const result = run(dmgBuilder, ['--app', disguisedApp, '--output', output], {
+    CODESIGN_BIN: codesign,
+    CODESIGN_MARKER: codesignMarker,
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /symbolic link|non-generator app|Claude\.app/i);
+  await assert.rejects(readFile(codesignMarker));
+});
+
+test('DMG builder rejects embedded Claude apps before signing or copying', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'claude-dmg-embedded-'));
+  const app = await generatorApp(root);
+  const output = join(root, 'Claude 中文生成器-macOS.dmg');
+  const codesignMarker = join(root, 'codesign-was-called');
+  const codesign = join(root, 'fake-codesign');
+  await mkdir(join(app, 'Contents', 'Resources', 'Claude.app'));
+  await writeFile(codesign, `#!/bin/sh\ntouch "$CODESIGN_MARKER"\n`);
+  await chmod(codesign, 0o755);
+
+  const result = run(dmgBuilder, ['--app', app, '--output', output], {
+    CODESIGN_BIN: codesign,
+    CODESIGN_MARKER: codesignMarker,
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /must not embed Claude\.app/i);
+  await assert.rejects(readFile(codesignMarker));
 });
 
 test('DMG builder stages only generator app and Applications alias before creating image', async () => {
@@ -77,6 +119,17 @@ test('bundle verifier rejects an embedded Claude application', async () => {
   const root = await mkdtemp(join(tmpdir(), 'claude-dmg-verifier-'));
   const app = await generatorApp(root);
   await mkdir(join(app, 'Contents', 'Resources', 'Claude.app'), { recursive: true });
+  const result = run(verifier, [app]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /must not embed Claude\.app/i);
+});
+
+test('bundle verifier rejects a symlink named as an embedded Claude application', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'claude-dmg-verifier-'));
+  const app = await generatorApp(root);
+  const target = join(root, 'external-Claude.app');
+  await mkdir(target);
+  await symlink(target, join(app, 'Contents', 'Resources', 'Claude.app'));
   const result = run(verifier, [app]);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /must not embed Claude\.app/i);

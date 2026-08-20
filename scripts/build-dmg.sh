@@ -25,7 +25,21 @@ done
 [[ -n "$app_path" && -n "$output_path" ]] || usage
 [[ -d "$app_path" ]] || fail "Generator app does not exist: $app_path"
 [[ "${app_path:t}" == 'Claude 中文生成器.app' ]] || fail "Refusing to package a non-generator app: $app_path"
+[[ ! -L "$app_path" ]] || fail "Refusing to sign a generator app supplied through a symbolic link: $app_path"
+canonical_app_path="${app_path:A}"
+[[ "$canonical_app_path" != '/Applications/Claude.app' && "$canonical_app_path" != '/Applications/Claude 中文.app' ]] || fail "Refusing to sign an official or generated Claude application: $canonical_app_path"
+[[ "$canonical_app_path" != /Applications/* ]] || fail "Generator app must be built outside /Applications: $canonical_app_path"
+[[ "${canonical_app_path:t}" == 'Claude 中文生成器.app' ]] || fail "Canonical generator app path is unsafe: $canonical_app_path"
+[[ -f "$canonical_app_path/Contents/Info.plist" ]] || fail "Generator app is missing Contents/Info.plist: $canonical_app_path"
 [[ ! -e "$output_path" || -f "$output_path" ]] || fail "DMG output path is not a file: $output_path"
+
+for forbidden in 'Claude.app' 'Claude 中文.app'; do
+  if find "$canonical_app_path" \( -type d -o -type l \) -name "$forbidden" -print -quit | grep -q .; then
+    fail "Generator bundle must not embed $forbidden"
+  fi
+done
+
+app_path="$canonical_app_path"
 
 output_dir="${output_path:h}"
 mkdir -p "$output_dir"

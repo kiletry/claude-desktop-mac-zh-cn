@@ -22,7 +22,7 @@ runtime="$resources/runtime"
 plist="$contents/Info.plist"
 
 for forbidden in 'Claude.app' 'Claude 中文.app'; do
-  if find "$app_path" -type d -name "$forbidden" -print -quit | grep -q .; then
+  if find "$app_path" \( -type d -o -type l \) -name "$forbidden" -print -quit | grep -q .; then
     fail "Generator bundle must not embed $forbidden"
   fi
 done
