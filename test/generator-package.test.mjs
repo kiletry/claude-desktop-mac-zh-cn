@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { access, mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, lstat, mkdtemp, mkdir, readFile, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -86,4 +86,16 @@ test('rejects dangerous output destinations before removing anything', async () 
     () => buildGeneratorApp({ ...paths, output: paths.rootDir }),
     /safe generated-app destination|refusing to remove/i,
   );
+});
+
+test('dereferences package symlinks so the generated app is self-contained', async () => {
+  const paths = await fixture();
+  await mkdir(join(paths.rootDir, 'node_modules', '.bin'), { recursive: true });
+  await symlink('../safe-package/index.js', join(paths.rootDir, 'node_modules', '.bin', 'safe-package'));
+
+  await buildGeneratorApp({ ...paths, sourceCommit: 'abc123' });
+
+  const packagedLink = join(paths.output, 'Contents', 'Resources', 'runtime', 'package', 'node_modules', '.bin', 'safe-package');
+  assert.equal((await lstat(packagedLink)).isSymbolicLink(), false);
+  assert.equal(await readFile(packagedLink, 'utf8'), 'export default true;\n');
 });

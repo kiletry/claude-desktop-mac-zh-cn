@@ -45,7 +45,11 @@ export async function buildGeneratorApp({
 
   await rm(appPath, { recursive: true, force: true });
   await mkdir(packageRoot, { recursive: true });
-  await Promise.all(packageEntries.map((entry) => cp(join(sourceRoot, entry), join(packageRoot, entry), { recursive: true, force: true })));
+  await Promise.all(packageEntries.map((entry) => cp(join(sourceRoot, entry), join(packageRoot, entry), {
+    recursive: true,
+    force: true,
+    dereference: true,
+  })));
   await mkdir(macOS, { recursive: true });
   await cp(swiftExecutable, join(macOS, 'ClaudeChineseGenerator'), { force: true });
   await Promise.all([
