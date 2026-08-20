@@ -130,6 +130,26 @@ export function patchLocaleAssets(assets) {
 }
 
 export function patchLocaleRuntime(source) {
+  const modernTargets = [
+    {
+      target: 'function u5e(e){try{',
+      replacement: 'function u5e(e){e=`zh-CN`;try{',
+      label: 'modern runtime locale loader',
+    },
+    {
+      target: 'function d5e(e){return u5e(e)?(io.set(`locale`,e),!0):!1}',
+      replacement: 'function d5e(e){return u5e(`zh-CN`)?(io.set(`locale`,`zh-CN`),!0):!1}',
+      label: 'modern runtime locale request handler',
+    },
+    {
+      target: 'u5e(io.get(`locale`,c5e()))',
+      replacement: 'u5e(`zh-CN`)',
+      label: 'modern runtime locale initialization',
+    },
+  ];
+  if (modernTargets.every(({ target }) => source.includes(target))) {
+    return modernTargets.reduce((value, { target, replacement }) => value.replace(target, replacement), source);
+  }
   const replacements = [
     {
       target: 'function B9e(e){try{',
@@ -156,6 +176,21 @@ export function patchLocaleRuntime(source) {
     patched = patched.replace(target, replacement);
   }
   return patched;
+}
+
+export async function findRuntimeLocaleAsset(buildDirectory) {
+  const entries = await readdir(buildDirectory, { withFileTypes: true });
+  const candidates = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !/^index\.chunk-.*\.js$/.test(entry.name)) continue;
+    const path = join(buildDirectory, entry.name);
+    const content = await readFile(path, 'utf8');
+    if (content.includes('function B9e') && content.includes('function V9e')) candidates.push(path);
+  }
+  if (candidates.length !== 1) {
+    throw new CompatibilityError(`Expected exactly one runtime locale asset, found ${candidates.length}.`);
+  }
+  return candidates[0];
 }
 
 export function patchNativeMenuLocale(source) {
@@ -375,7 +410,7 @@ async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, inf
   const extractionPath = join(workingDir, `.Claude 中文.asar-src-${process.pid}-${Date.now()}`);
   try {
     await extractAll(appAsarPath, extractionPath);
-    const runtimePath = join(extractionPath, '.vite', 'build', 'index.chunk-s0W1vGz6.js');
+    const runtimePath = await findRuntimeLocaleAsset(join(extractionPath, '.vite', 'build'));
     const source = await readFile(runtimePath, 'utf8');
     await writeFile(runtimePath, patchNativeMenuLocale(patchLocaleRuntime(source)));
     const mainViewPath = join(extractionPath, '.vite', 'build', 'mainView.js');

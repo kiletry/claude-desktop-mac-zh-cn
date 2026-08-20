@@ -16,6 +16,7 @@ import {
   patchLocaleRegistry,
   patchLocaleAssets,
   patchLocaleRuntime,
+  findRuntimeLocaleAsset,
   selectCloneTranslationVersion,
   validateTranslationPayloads,
 } from '../src/localized-clone.mjs';
@@ -143,6 +144,21 @@ test('forces the packaged runtime to keep the Chinese locale after web app reque
   assert.match(result, /function V9e\(e\)\{return B9e\(`zh-CN`\)\?\(Sl\.set\(`locale`,`zh-CN`\),!0\):!1\}/);
   assert.match(result, /try\{B9e\(`zh-CN`\)\}/);
   assert.throws(() => patchLocaleRuntime('function V9e(e){}'), /runtime locale patch target/i);
+});
+
+test('patches the renamed runtime functions used by Claude 1.32885', () => {
+  const source = 'function u5e(e){try{let t=l5e(e);return D.debug(`Switching to locale "%s"`,e),Oy=t,a5e?.next(t),!0}catch(t){return!1}}function d5e(e){return u5e(e)?(io.set(`locale`,e),!0):!1}function f5e(){u5e(io.get(`locale`,c5e()))}';
+  const result = patchLocaleRuntime(source);
+  assert.match(result, /u5e\(e\)\{e=`zh-CN`/);
+  assert.match(result, /d5e\(e\)\{return u5e\(`zh-CN`\)/);
+  assert.match(result, /f5e\(\)\{u5e\(`zh-CN`\)\}/);
+});
+
+test('finds the renamed runtime locale chunk in newer Claude bundles', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'claude-runtime-asset-'));
+  await writeFile(join(root, 'index.chunk-newhash.js'), 'function B9e(e){} function V9e(e){}');
+  await writeFile(join(root, 'index.chunk-other.js'), 'function other(){}');
+  assert.equal(await findRuntimeLocaleAsset(root), join(root, 'index.chunk-newhash.js'));
 });
 
 test('computes Electron ASAR integrity from the packaged JSON header', () => {
