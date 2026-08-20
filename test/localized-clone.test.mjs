@@ -116,6 +116,12 @@ test('patches exactly one supported locale registry and rejects ambiguous bundle
   );
 });
 
+test('patches the renamed locale registry used by newer Claude bundles', () => {
+  const source = 'var vv=["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"];';
+  assert.match(patchLocaleRegistry(source), /vv=\["en-US".*"zh-CN"\]/);
+  assert.equal(patchLocaleAssets([{ path: 'shared-2.js', content: source }])[0].content.includes('"zh-CN"'), true);
+});
+
 test('patches only the one asset that owns the supported locale registry', () => {
   const source = 'const Bc=["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"];';
   const result = patchLocaleAssets([

@@ -104,17 +104,23 @@ export function buildTranslationResourcePlan({ resourcesDir, sourceFiles, availa
 }
 
 export function patchLocaleRegistry(source) {
-  const target = `Bc=${SUPPORTED_LOCALE_ARRAY}`;
-  const matches = [...source.matchAll(new RegExp(escapeRegExp(target), 'g'))];
+  const targets = [
+    `Bc=${SUPPORTED_LOCALE_ARRAY}`,
+    `vv=${SUPPORTED_LOCALE_ARRAY}`,
+  ];
+  const matches = targets.flatMap((target) => [...source.matchAll(new RegExp(escapeRegExp(target), 'g'))
+    .map((match) => ({ ...match, target }))]);
   if (matches.length !== 1) {
     throw new CompatibilityError(`Expected exactly one supported locale registry, found ${matches.length}.`);
   }
-  const offset = matches[0].index + target.length;
+  const { index, target } = matches[0];
+  const offset = index + target.length;
   return `${source.slice(0, offset - 1)},"zh-CN"${source.slice(offset - 1)}`;
 }
 
 export function patchLocaleAssets(assets) {
-  const candidates = assets.filter(({ content }) => content.includes(`Bc=${SUPPORTED_LOCALE_ARRAY}`));
+  const candidates = assets.filter(({ content }) =>
+    content.includes(`Bc=${SUPPORTED_LOCALE_ARRAY}`) || content.includes(`vv=${SUPPORTED_LOCALE_ARRAY}`));
   if (candidates.length !== 1) {
     throw new CompatibilityError(`Expected exactly one locale registry asset, found ${candidates.length}.`);
   }
