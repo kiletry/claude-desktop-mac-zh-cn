@@ -351,6 +351,7 @@ export async function buildLocalizedClone({
       resourcesDir,
       workingDir: outputDir,
       infoPlist,
+      execFile,
     });
     await execFile('/usr/bin/plutil', ['-replace', 'CFBundleDisplayName', '-string', 'Claude 中文', '--', infoPlist], { encoding: 'utf8' });
     await execFile('/usr/bin/plutil', ['-replace', 'CFBundleIdentifier', '-string', CLONE_BUNDLE_IDENTIFIER, '--', infoPlist], { encoding: 'utf8' });
@@ -413,7 +414,7 @@ export async function buildLocalizedClone({
   }
 }
 
-async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, infoPlist }) {
+async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, infoPlist, execFile = defaultExecFile }) {
   if (!(await exists(appAsarPath))) return false;
   const extractionPath = join(workingDir, `.Claude 中文.asar-src-${process.pid}-${Date.now()}`);
   try {
