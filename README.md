@@ -4,9 +4,21 @@
 
 官方应用始终保持不变：不修改、不重签名、不写入 `/Applications/Claude.app`。
 
-## 快速使用
+## 图形化快速使用（推荐）
 
-要求：macOS、Node.js 18 或更高版本，以及已安装的官方 Claude Desktop。
+从 GitHub Release 下载 `Claude 中文生成器-…-macOS.dmg`，拖入“应用程序”后打开
+`Claude 中文生成器`。它会先检查官方 Claude 的版本、签名和 Gatekeeper 状态；只有你
+点击“生成/更新中文副本”并确认后，才会创建或覆盖
+`/Applications/Claude 中文.app`。图形化生成器内置 Node 运行时，普通用户不需要另行
+安装 Node.js。
+
+详细的首次启动、更新、日志、回滚、Gatekeeper 和第三方工具说明见
+[图形化安装与更新指南](docs/GRAPHICAL-INSTALLER.md)。
+
+## 命令行备用路径
+
+图形化安装器不可用时，仍可使用 CLI。要求：macOS、Node.js 18 或更高版本，以及已安装
+的官方 Claude Desktop。
 
 ```bash
 ./install.sh status
@@ -42,7 +54,8 @@ open "/Applications/Claude 中文.app"
 
 ## 更新 Claude 后
 
-官方 Claude 更新后，重新运行：
+官方 Claude 更新后，优先重新打开图形化生成器，通过检查屏幕确认版本后点击“生成/更新
+中文副本”。CLI 用户则重新运行：
 
 ```bash
 ./install.sh generate --replace

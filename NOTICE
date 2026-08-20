@@ -1,4 +1,4 @@
-Claude Desktop macOS Chinese Companion
+Claude Desktop macOS Simplified Chinese Generator
 
 Translation data source:
 https://github.com/ICERainbow666/claude-desktop-zh-cn
@@ -7,7 +7,14 @@ Special thanks to ICERainbow666 and the claude-desktop-zh-cn community for
 maintaining the Simplified Chinese translation files used to build the local
 dictionary.
 
-This repository independently implements a separate offline, Accessibility-
-only macOS companion. It never deploys resources to, copies, re-signs, backs
-up, restores, or otherwise writes files inside Claude.app. It does not
-redistribute Claude Desktop and is not affiliated with Anthropic.
+This repository independently implements a local generator that checks an
+official Claude.app and, only after explicit confirmation, creates a separate
+localized copy. It never modifies, re-signs, backs up, restores, or otherwise
+writes files inside the official Claude.app. It does not redistribute Claude
+Desktop and is not affiliated with Anthropic.
+
+The generated copy uses local temporary ad-hoc signing and is not an
+Anthropic Developer ID signed or notarized application. Gatekeeper, Cowork,
+Claude Code, and other official installation checks can report it as an
+invalid installation. Gateway/API Key configurations can also place the copy
+in 3P (third-party) / Cowork mode with unavailable mode controls.

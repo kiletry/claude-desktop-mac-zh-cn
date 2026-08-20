@@ -1,0 +1,127 @@
+name: Release graphical generator
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to build and publish (for example v0.2.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '22.16.0'
+  NODE_DARWIN_ARM64_SHA256: '1d7f34ec4c03e12d8b33481e5c4560432d7dc31a0ef3ff5a4d9a8ada7cf6ecc9'
+  NODE_DARWIN_X64_SHA256: '838d400f7e66c804e5d11e2ecb61d6e9e878611146baff69d6a2def3cc23f4ac'
+
+jobs:
+  release:
+    name: Build and publish macOS generator
+    runs-on: macos-14
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Validate release tag
+        shell: zsh
+        run: |
+          [[ "$RELEASE_TAG" =~ '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$' ]]
+          git rev-parse --verify "refs/tags/$RELEASE_TAG"
+
+      - name: Install generator dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Run Node and Swift tests
+        run: |
+          npm test
+          swift test --package-path installer-macos
+
+      - name: Pack the clean CLI source archive
+        shell: zsh
+        run: |
+          set -euo pipefail
+          mkdir -p dist/release
+          npm pack --pack-destination dist/release
+          [[ "$(find dist/release -maxdepth 1 -name '*.tgz' -type f | wc -l | tr -d ' ')" == 1 ]]
+
+      - name: Download and verify embedded Node runtimes
+        shell: zsh
+        run: |
+          set -euo pipefail
+          mkdir -p dist/downloads dist/runtimes
+          arm64_archive="dist/downloads/node-v${{ env.NODE_VERSION }}-darwin-arm64.tar.gz"
+          x64_archive="dist/downloads/node-v${{ env.NODE_VERSION }}-darwin-x64.tar.gz"
+          curl --fail --location --retry 3 --output "$arm64_archive" "https://nodejs.org/dist/v${{ env.NODE_VERSION }}/node-v${{ env.NODE_VERSION }}-darwin-arm64.tar.gz"
+          curl --fail --location --retry 3 --output "$x64_archive" "https://nodejs.org/dist/v${{ env.NODE_VERSION }}/node-v${{ env.NODE_VERSION }}-darwin-x64.tar.gz"
+          checksums="dist/downloads/SHA256SUMS"
+          print -- "${{ env.NODE_DARWIN_ARM64_SHA256 }}  $arm64_archive" > "$checksums"
+          print -- "${{ env.NODE_DARWIN_X64_SHA256 }}  $x64_archive" >> "$checksums"
+          shasum -a 256 -c "$checksums"
+          arm64_dir="dist/downloads/node-arm64"
+          x64_dir="dist/downloads/node-x64"
+          mkdir -p "$arm64_dir" "$x64_dir"
+          tar -xzf "$arm64_archive" -C "$arm64_dir"
+          tar -xzf "$x64_archive" -C "$x64_dir"
+          install -m 0755 "$arm64_dir/node-v${{ env.NODE_VERSION }}-darwin-arm64/bin/node" dist/runtimes/node-arm64
+          install -m 0755 "$x64_dir/node-v${{ env.NODE_VERSION }}-darwin-x64/bin/node" dist/runtimes/node-x64
+
+      - name: Build universal Swift generator
+        shell: zsh
+        run: |
+          set -euo pipefail
+          swift build --configuration release --package-path installer-macos --arch arm64
+          swift build --configuration release --package-path installer-macos --arch x86_64
+          lipo -create \
+            installer-macos/.build/arm64-apple-macosx/release/ClaudeChineseGenerator \
+            installer-macos/.build/x86_64-apple-macosx/release/ClaudeChineseGenerator \
+            -output dist/ClaudeChineseGenerator-universal
+          lipo -verify_arch arm64 x86_64 dist/ClaudeChineseGenerator-universal
+
+      - name: Build and verify release artifacts
+        shell: zsh
+        run: |
+          set -euo pipefail
+          app='dist/Claude 中文生成器.app'
+          mkdir -p dist/release
+          npm run build:generator -- \
+            --runtime-dir dist/runtimes \
+            --executable dist/ClaudeChineseGenerator-universal \
+            --output "$app"
+          npm run build:dmg -- \
+            --app "$app" \
+            --output "dist/release/Claude 中文生成器-${RELEASE_TAG}-macOS.dmg"
+          npm run verify:generator-bundle -- "$app"
+          [[ "$(find dist/release -maxdepth 1 -name '*.dmg' -type f | wc -l | tr -d ' ')" == 1 ]]
+          [[ "$(find dist/release -maxdepth 1 -name '*.tgz' -type f | wc -l | tr -d ' ')" == 1 ]]
+
+      - name: Publish exactly the verified release files
+        shell: zsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          notes="$(mktemp)"
+          cat > "$notes" <<'EOF'
+          ## Claude 中文生成器
+
+          - 下载并拖入“应用程序”后，先打开生成器检查官方 Claude，再明确确认生成或更新独立中文副本。
+          - 中文副本使用本地临时签名（ad-hoc signing），不是 Anthropic 官方签名或公证应用；Gatekeeper、Cowork 或 Claude Code 可能显示“无效安装”。
+          - Gateway/API Key 配置可能进入 3P（第三方）/ Cowork 模式并禁用模式选择；需要官方 Team ID、Cowork 或 Claude Code 功能时请使用官方 Claude.app。
+          - 仅发布生成器 DMG 和 CLI 源码包；不包含或重新分发 Claude.app。
+          EOF
+          gh release create "$RELEASE_TAG" \
+            dist/release/*.dmg \
+            dist/release/*.tgz \
+            --verify-tag \
+            --title "Claude 中文生成器 $RELEASE_TAG" \
+            --notes-file "$notes"
