@@ -47,6 +47,7 @@ test('builds an app with both embedded Node runtimes and a resource manifest', a
   const plist = await readFile(join(paths.output, 'Contents', 'Info.plist'), 'utf8');
   assert.match(plist, /com\.kiletry\.claude-desktop-mac-zh-cn-generator/);
   assert.match(plist, /Claude 中文生成器/);
+  assert.match(plist, /CFBundleShortVersionString.*2\.4\.6/);
 });
 
 test('rejects a runtime directory without both architecture binaries', async () => {

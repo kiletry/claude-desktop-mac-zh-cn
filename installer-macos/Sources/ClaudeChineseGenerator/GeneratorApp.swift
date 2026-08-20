@@ -47,6 +47,7 @@ private struct GeneratorWindow: View {
             case let .ready(inspection):
                 Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 6) {
                     GridRow { Text("版本"); Text(inspection.version) }
+                    GridRow { Text("Bundle ID"); Text(inspection.bundleIdentifier) }
                     GridRow { Text("签名"); Text(inspection.signingVerified ? "已验证" : "未验证") }
                     GridRow { Text("Gatekeeper"); Text(inspection.gatekeeperAccepted ? "已接受" : "未接受") }
                 }
@@ -83,8 +84,8 @@ private struct GeneratorWindow: View {
     }
 
     private var limitations: some View {
-        GroupBox("使用限制") {
-            Text("中文副本是独立、临时签名的应用。它可能不通过官方 Team ID、Gatekeeper、公证、Cowork 或 Claude Code 的安装校验。需要这些能力时，请继续使用官方 Claude.app。")
+        GroupBox("使用限制与第三方工具") {
+            Text("中文副本是独立、临时签名的应用。它可能不通过官方 Team ID、Gatekeeper、公证、Cowork 或 Claude Code 的安装校验。Cockpit Tools 和 CC Switch 可能仍写入官方配置目录；需要 API/Gateway 时请将工具指向中文副本及其独立数据目录。需要官方 Team ID、Cowork 或 Claude Code 时，请继续使用官方 Claude.app。")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
         }

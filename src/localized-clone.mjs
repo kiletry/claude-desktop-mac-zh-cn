@@ -2,6 +2,7 @@ import { CompatibilityError, UserError } from './errors.mjs';
 import { createHash } from 'node:crypto';
 import { access, chmod, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createPackage, extractAll } from '@electron/asar';
 
 import { downloadCompatibleTranslation } from './translation-source.mjs';
 
@@ -301,7 +302,6 @@ export async function buildLocalizedClone({
       resourcesDir,
       workingDir: outputDir,
       infoPlist,
-      execFile,
     });
     await execFile('/usr/bin/plutil', ['-replace', 'CFBundleDisplayName', '-string', 'Claude 中文', '--', infoPlist], { encoding: 'utf8' });
     await execFile('/usr/bin/plutil', ['-replace', 'CFBundleIdentifier', '-string', CLONE_BUNDLE_IDENTIFIER, '--', infoPlist], { encoding: 'utf8' });
@@ -364,11 +364,11 @@ export async function buildLocalizedClone({
   }
 }
 
-async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, infoPlist, execFile }) {
+async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, infoPlist }) {
   if (!(await exists(appAsarPath))) return false;
   const extractionPath = join(workingDir, `.Claude 中文.asar-src-${process.pid}-${Date.now()}`);
   try {
-    await execFile('npx', ['--yes', '@electron/asar', 'extract', appAsarPath, extractionPath], { encoding: 'utf8' });
+    await extractAll(appAsarPath, extractionPath);
     const runtimePath = join(extractionPath, '.vite', 'build', 'index.chunk-s0W1vGz6.js');
     const source = await readFile(runtimePath, 'utf8');
     await writeFile(runtimePath, patchNativeMenuLocale(patchLocaleRuntime(source)));
@@ -380,7 +380,7 @@ async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, inf
       mainViewSource,
       buildWebTranslationMap(englishCatalog, chineseCatalog),
     ));
-    await execFile('npx', ['--yes', '@electron/asar', 'pack', extractionPath, appAsarPath], { encoding: 'utf8' });
+    await createPackage(extractionPath, appAsarPath);
     const hash = computeAsarHeaderIntegrity(await readFile(appAsarPath));
     await execFile('/usr/libexec/PlistBuddy', [
       '-c', `Set :ElectronAsarIntegrity:Resources/app.asar:hash ${hash}`, infoPlist,

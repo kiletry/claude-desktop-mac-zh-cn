@@ -101,8 +101,12 @@ jobs:
             --app "$app" \
             --output "dist/release/Claude 中文生成器-${RELEASE_TAG}-macOS.dmg"
           npm run verify:generator-bundle -- "$app"
+          npm run verify:generator-bundle -- --clean-check "$app"
+          npm pack --pack-destination dist/release
+          (cd dist/release && shasum -a 256 *.dmg *.tgz > SHA256SUMS)
           [[ "$(find dist/release -maxdepth 1 -name '*.dmg' -type f | wc -l | tr -d ' ')" == 1 ]]
           [[ "$(find dist/release -maxdepth 1 -name '*.tgz' -type f | wc -l | tr -d ' ')" == 1 ]]
+          [[ "$(find dist/release -maxdepth 1 -name 'SHA256SUMS' -type f | wc -l | tr -d ' ')" == 1 ]]
 
       - name: Publish exactly the verified release files
         shell: zsh
@@ -122,6 +126,7 @@ jobs:
           gh release create "$RELEASE_TAG" \
             dist/release/*.dmg \
             dist/release/*.tgz \
+            dist/release/SHA256SUMS \
             --verify-tag \
             --title "Claude 中文生成器 $RELEASE_TAG" \
             --notes-file "$notes"

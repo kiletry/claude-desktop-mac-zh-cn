@@ -60,7 +60,7 @@ export async function buildGeneratorApp({
     chmod(join(macOS, 'ClaudeChineseGenerator'), 0o755),
     ...runtimeNames.map((name) => chmod(join(resources, 'runtime', name), 0o755)),
   ]);
-  await writeFile(join(contents, 'Info.plist'), infoPlist());
+  await writeFile(join(contents, 'Info.plist'), infoPlist(packageJson.version));
   await writeFile(join(resources, 'runtime', 'manifest.json'), `${JSON.stringify({
     generatorVersion: packageJson.version,
     supportedArchitectures: ['arm64', 'x64'],
@@ -103,7 +103,7 @@ async function currentCommit(cwd) {
   try { return (await execFile('git', ['rev-parse', 'HEAD'], { cwd })).stdout.trim(); } catch { return 'unknown'; }
 }
 
-function infoPlist() {
+function infoPlist(version) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -112,7 +112,7 @@ function infoPlist() {
 <key>CFBundleName</key><string>Claude 中文生成器</string>
 <key>CFBundleDisplayName</key><string>Claude 中文生成器</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.0</string>
+<key>CFBundleShortVersionString</key><string>${version}</string>
 <key>ClaudeChineseGeneratorUsageDescription</key><string>Writes a separately signed Chinese Claude copy only after you confirm the operation.</string>
 <key>NSHumanReadableCopyright</key><string>Creates an independent localized Claude copy after confirmation.</string>
 </dict></plist>

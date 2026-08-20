@@ -26,6 +26,7 @@ async function createFixture() {
   await writeFile(join(official, 'Contents', 'Info.plist'), `<?xml version="1.0"?><plist><dict><key>CFBundleIdentifier</key><string>com.anthropic.claudefordesktop</string><key>CFBundleShortVersionString</key><string>1.30096.5</string></dict></plist>`);
   await cp(join(projectRoot, 'bin'), join(packaged, 'bin'), { recursive: true });
   await cp(join(projectRoot, 'src'), join(packaged, 'src'), { recursive: true });
+  await cp(join(projectRoot, 'node_modules'), join(packaged, 'node_modules'), { recursive: true, dereference: true });
   await writeFile(node, '#!/bin/sh\nexec "$CLEAN_CHECK_HOST_NODE" "$@"\n');
   await writeFile(x64Node, '#!/bin/sh\nexec "$CLEAN_CHECK_HOST_NODE" "$@"\n');
   await writeFile(codesign, '#!/bin/sh\ncase "$1" in -dv) echo "Signature=adhoc" >&2;; esac\nexit 0\n');
