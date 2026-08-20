@@ -21,3 +21,5 @@ Final review fixes: commits 32a8814 and 40f43ef. Replaced runtime `npx @electron
 Additional clean-check fix: commit 07ac96e. The clean acceptance now runs from its disposable directory with absolute embedded paths, so it does not depend on the caller's working directory. Real local packaged App verification and `Quality gate passed` both pass.
 
 Claude 1.32885.1 compatibility fixes: commits 735b8b2 and b2fdf7f. The generator now recognizes the renamed `vv` locale registry and automatically locates the hashed runtime chunk, including the newer `u5e/d5e` locale functions. Full Node suite passes 66/66; regenerated DMG passes bundle verification and clean-check.
+
+Follow-up compatibility and presentation fix: commit 71f7b38. Added the modern `tQ/BNn` native menu patch and a standalone blue-purple `ClaudeChineseGenerator.icns` icon. Current Claude `1.32885.1` runtime/menu patch probes pass; full Node suite passes 67/67 and the regenerated 81 MB DMG passes signature and clean-check verification.
