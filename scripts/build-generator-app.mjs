@@ -55,6 +55,7 @@ export async function buildGeneratorApp({
   await Promise.all([
     ...runtimeNames.map((name) => cp(runtimePaths[name], join(resources, 'runtime', name), { force: true })),
     cp(firstLaunchReadme, join(resources, 'README-first-launch.txt'), { force: true }),
+    cp(join(sourceRoot, 'installer-macos', 'Resources', 'ClaudeChineseGenerator.icns'), join(resources, 'ClaudeChineseGenerator.icns'), { force: true }),
   ]);
   await Promise.all([
     chmod(join(macOS, 'ClaudeChineseGenerator'), 0o755),
@@ -112,6 +113,7 @@ function infoPlist(version) {
 <key>CFBundleName</key><string>Claude 中文生成器</string>
 <key>CFBundleDisplayName</key><string>Claude 中文生成器</string>
 <key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleIconFile</key><string>ClaudeChineseGenerator.icns</string>
 <key>CFBundleShortVersionString</key><string>${version}</string>
 <key>ClaudeChineseGeneratorUsageDescription</key><string>Writes a separately signed Chinese Claude copy only after you confirm the operation.</string>
 <key>NSHumanReadableCopyright</key><string>Creates an independent localized Claude copy after confirmation.</string>

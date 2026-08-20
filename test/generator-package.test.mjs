@@ -25,6 +25,7 @@ async function fixture() {
   await writeFile(join(rootDir, 'package-lock.json'), '{"lockfileVersion":3}\n');
   await writeFile(join(rootDir, 'node_modules', 'safe-package', 'index.js'), 'export default true;\n');
   await writeFile(join(rootDir, 'installer-macos', 'Resources', 'README-first-launch.txt'), 'first launch\n');
+  await writeFile(join(rootDir, 'installer-macos', 'Resources', 'ClaudeChineseGenerator.icns'), 'icon');
   await writeFile(join(runtimeDir, 'node-arm64'), 'arm runtime');
   await writeFile(join(runtimeDir, 'node-x64'), 'x64 runtime');
   await writeFile(executable, '#!/bin/sh\nexit 0\n');
@@ -48,6 +49,8 @@ test('builds an app with both embedded Node runtimes and a resource manifest', a
   assert.match(plist, /com\.kiletry\.claude-desktop-mac-zh-cn-generator/);
   assert.match(plist, /Claude 中文生成器/);
   assert.match(plist, /CFBundleShortVersionString.*2\.4\.6/);
+  assert.match(plist, /CFBundleIconFile.*ClaudeChineseGenerator\.icns/);
+  assert.equal(await exists(join(resourceRoot, 'ClaudeChineseGenerator.icns')), true);
 });
 
 test('rejects a runtime directory without both architecture binaries', async () => {

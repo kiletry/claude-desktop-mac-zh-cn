@@ -58,6 +58,9 @@ trap cleanup EXIT HUP INT TERM
 cp -R "$app_path" "$staging_dir/Claude 中文生成器.app"
 ln -s /Applications "$staging_dir/Applications"
 
+# Finder displays the generator's bundle icon for the app; the DMG itself uses
+# the stable volume name and a clean Applications alias.
+
 # hdiutil create produces the final image directly; it does not attach a volume,
 # so there is no mounted image to detach.  This keeps failed builds from leaving
 # a mounted writable volume behind.
