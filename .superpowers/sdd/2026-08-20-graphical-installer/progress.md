@@ -7,3 +7,5 @@ Pre-flight review: no contradictions found between the approved spec, plan, and 
 Task 1: complete — commit 7648ed9. Initial review found P1 issues in final verification/error ordering and progress-stage accuracy; implementer fixed both and added regression tests. Focused tests 19/19 and full suite 48/48 pass.
 
 Task 2: implementation complete — commit c44d192. Review fixes applied locally: official bundle ID aligned with `com.anthropic.claudefordesktop`, cancellation now owns and cancels the ViewModel generation task, failed states require a fresh official-app check, and redaction covers common secret names. Swift release build passes; XCTest remains unavailable on this machine because only CommandLineTools are installed.
+
+Task 3: complete — commits b04bbe5 and 00c0fd5. Added deterministic self-contained App assembly with embedded arm64/x64 Node runtimes, CLI resources, manifest, and first-launch notice. Follow-up review fix rejects unsafe output destinations before deletion and reports missing embedded CLI clearly. Packaging tests 4/4, full Node suite 52/52, Swift release build, and diff check pass.
