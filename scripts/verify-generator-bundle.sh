@@ -90,9 +90,13 @@ EOF
     clean_env+=(CLEAN_CHECK_HOST_NODE="$CLEAN_CHECK_HOST_NODE")
   fi
   mkdir -p "$clean_root/tmp"
+  clean_node="$node"
+  clean_cli="$cli"
+  if [[ "$clean_node" != /* ]]; then clean_node="$PWD/$clean_node"; fi
+  if [[ "$clean_cli" != /* ]]; then clean_cli="$PWD/$clean_cli"; fi
   (
-    cd "$runtime/package"
-    env -i "${clean_env[@]}" "$node" "$cli" status --app-dir "$official_app" >/dev/null
+    cd "$clean_root"
+    env -i "${clean_env[@]}" "$clean_node" "$clean_cli" status --app-dir "$official_app" >/dev/null
   ) || fail "Embedded CLI status path failed during clean-machine check"
 
   find "$official_app" -xdev -type f -exec shasum -a 256 {} + | LC_ALL=C sort > "$after_snapshot"
