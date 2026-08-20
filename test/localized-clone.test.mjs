@@ -203,6 +203,14 @@ test('patches native macOS menus and role-generated submenu labels', () => {
   assert.throws(() => patchNativeMenuLocale('function n$(){}'), /native menu locale/i);
 });
 
+test('patches the modern native menu builder used by Claude 1.32885', () => {
+  const source = 'async function tQ(){let e=await BNn();return o.Menu.buildFromTemplate(e)}';
+  const result = patchNativeMenuLocale(source);
+  assert.match(result, /Menu\.buildFromTemplate\(e\.map\(i\)\)/);
+  assert.match(result, /About Claude/);
+  assert.match(result, /撤销/);
+});
+
 test('builds a separately signed clone without changing the official source bundle', async () => {
   const root = await mkdtemp(join(tmpdir(), 'claude-localized-clone-'));
   const appDir = join(root, 'Claude.app');

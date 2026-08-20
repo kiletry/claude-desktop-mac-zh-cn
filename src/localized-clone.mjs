@@ -196,6 +196,14 @@ export async function findRuntimeLocaleAsset(buildDirectory) {
 export function patchNativeMenuLocale(source) {
   const target = 'function n$(){let e=await _Sn();return o.Menu.buildFromTemplate(e)}';
   const count = source.split(target).length - 1;
+  if (count === 0) {
+    const modernTarget = 'async function tQ(){let e=await BNn();return o.Menu.buildFromTemplate(e)}';
+    if (source.split(modernTarget).length - 1 !== 1) {
+      throw new CompatibilityError('Expected exactly one native menu locale target, found 0.');
+    }
+    const modernPatch = 'async function tQ(){let e=await BNn();const t={File:`文件`,Edit:`编辑`,View:`视图`,Window:`窗口`,Help:`帮助` ,"About Claude":`关于 Claude`,"Settings…":`设置…`,"Check for Updates…":`检查更新…`,"New Conversation":`新建对话`,"Show Main Window":`显示主窗口`,"Close Window":`关闭窗口`,"Copy URL":`复制网址`,"Reload This Page":`重新加载此页`,"Actual Size":`实际大小`,"Zoom In":`放大`,"Zoom Out":`缩小`,"Enter Full Screen":`进入全屏`,"Exit Full Screen":`退出全屏`,"Claude Help":`Claude 帮助`,"Get Support":`获取支持`,Quit:`退出`,Cancel:`取消`,Reset:`重置`,Restart:`重启`,"Show App":`显示应用`};const r={undo:`撤销`,redo:`重做`,cut:`剪切`,copy:`复制`,paste:`粘贴`,selectAll:`全选`,minimize:`最小化`,close:`关闭窗口`,front:`全部置于最前`,services:`服务`,hide:`隐藏 Claude`,hideOthers:`隐藏其他`,unhide:`显示全部`};const i=e=>{if(!e||typeof e!==`object`)return e;const n={...e};if(Array.isArray(e.submenu))n.submenu=e.submenu.map(i);if(typeof e.label===`string`)n.label=t[e.label]??e.label;else if(typeof e.role===`string`&&r[e.role])n.label=r[e.role];return n};return o.Menu.buildFromTemplate(e.map(i))}';
+    return source.replace(modernTarget, modernPatch);
+  }
   if (count !== 1) {
     throw new CompatibilityError(`Expected exactly one native menu locale target, found ${count}.`);
   }
