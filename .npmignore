@@ -7,3 +7,9 @@ docs/superpowers/plans/2026-08-15-claude-localized-clone.md
 docs/superpowers/specs/2026-08-15-claude-localized-clone-design.md
 *.tgz
 *.tar.gz
+installer-macos/.build/
+Claude.app/
+Claude 中文.app/
+*.keychain
+*.keychain-db
+.env

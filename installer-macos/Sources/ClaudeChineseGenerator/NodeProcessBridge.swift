@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 struct ProcessResult: Equatable, Sendable {
     let exitCode: Int32
@@ -34,8 +35,15 @@ final class NodeProcessBridge: GeneratorProcessRunning, @unchecked Sendable {
     }
 
     static var bundledNodeURL: URL {
-        Bundle.main.url(forResource: "node", withExtension: nil, subdirectory: "runtime")
-            ?? URL(fileURLWithPath: "/usr/bin/node")
+        let architecture = ProcessInfo.processInfo.machineArchitecture
+        let runtimeName: String
+        switch architecture {
+        case "arm64": runtimeName = "node-arm64"
+        case "x86_64": runtimeName = "node-x64"
+        default: return URL(fileURLWithPath: "/nonexistent/unsupported-node-runtime-\(architecture)")
+        }
+        return Bundle.main.url(forResource: runtimeName, withExtension: nil, subdirectory: "runtime")
+            ?? URL(fileURLWithPath: "/nonexistent/missing-embedded-\(runtimeName)")
     }
 
     static var bundledCommandPrefix: [String] {
@@ -47,6 +55,12 @@ final class NodeProcessBridge: GeneratorProcessRunning, @unchecked Sendable {
 
     func run(arguments: [String], environment: [String: String], onEvent: @escaping (GeneratorEvent) -> Void) async throws -> ProcessResult {
         try Task.checkCancellation()
+        guard executableURL.path.contains("unsupported-node-runtime") == false else {
+            throw NodeProcessBridgeError.launchFailed("不支持当前 Mac 架构：\(ProcessInfo.processInfo.machineArchitecture)。仅支持 Apple Silicon 和 Intel Mac。")
+        }
+        guard FileManager.default.isExecutableFile(atPath: executableURL.path) else {
+            throw NodeProcessBridgeError.launchFailed("未找到内置 Node 运行时：\(executableURL.path)。请重新下载 Claude 中文生成器。")
+        }
         let process = Process()
         process.executableURL = executableURL
         process.arguments = arguments.contains("--json-events") ? arguments : arguments + ["--json-events"]
@@ -119,10 +133,17 @@ final class NodeProcessBridge: GeneratorProcessRunning, @unchecked Sendable {
     }
 
     private func sanitizedEnvironment(_ environment: [String: String]) -> [String: String] {
-        environment.filter { key, _ in
+        var safe = environment.filter { key, _ in
             let name = key.lowercased()
             return !["token", "secret", "password", "credential", "cookie", "apikey", "api_key", "oauth"].contains { name.contains($0) }
         }
+        // Keep HOME supplied by the parent process. The only generator-specific
+        // variable selects the independent Chinese clone profile.
+        safe["CLAUDE_DESKTOP_ZH_CN_USER_DATA_DIR"] = safe["CLAUDE_DESKTOP_ZH_CN_USER_DATA_DIR"]
+            ?? FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support/Claude Desktop zh-CN")
+                .path
+        return safe
     }
 }
 
@@ -209,5 +230,20 @@ private extension NSLock {
     func withLock<T>(_ body: () throws -> T) rethrows -> T {
         lock(); defer { unlock() }
         return try body()
+    }
+}
+
+private extension ProcessInfo {
+    /// `ProcessInfo` does not expose the machine type on the Command Line Tools
+    /// SDK, so retain the intended ProcessInfo call site with a small Darwin
+    /// backed compatibility property.
+    var machineArchitecture: String {
+        var system = utsname()
+        uname(&system)
+        return withUnsafePointer(to: &system.machine) { pointer in
+            pointer.withMemoryRebound(to: CChar.self, capacity: 256) {
+                String(cString: $0)
+            }
+        }
     }
 }
