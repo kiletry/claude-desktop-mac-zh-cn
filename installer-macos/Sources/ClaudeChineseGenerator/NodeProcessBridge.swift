@@ -48,7 +48,7 @@ final class NodeProcessBridge: GeneratorProcessRunning, @unchecked Sendable {
 
     static var bundledCommandPrefix: [String] {
         guard let commandURL = Bundle.main.url(forResource: "claude-desktop-mac-zh-cn", withExtension: "mjs", subdirectory: "runtime/package/bin") else {
-            return []
+            return ["/nonexistent/missing-embedded-cli.mjs"]
         }
         return [commandURL.path]
     }
@@ -57,6 +57,9 @@ final class NodeProcessBridge: GeneratorProcessRunning, @unchecked Sendable {
         try Task.checkCancellation()
         guard executableURL.path.contains("unsupported-node-runtime") == false else {
             throw NodeProcessBridgeError.launchFailed("不支持当前 Mac 架构：\(ProcessInfo.processInfo.machineArchitecture)。仅支持 Apple Silicon 和 Intel Mac。")
+        }
+        guard arguments.first?.contains("missing-embedded-cli") != true else {
+            throw NodeProcessBridgeError.launchFailed("未找到内置 CLI：请重新下载 Claude 中文生成器。")
         }
         guard FileManager.default.isExecutableFile(atPath: executableURL.path) else {
             throw NodeProcessBridgeError.launchFailed("未找到内置 Node 运行时：\(executableURL.path)。请重新下载 Claude 中文生成器。")

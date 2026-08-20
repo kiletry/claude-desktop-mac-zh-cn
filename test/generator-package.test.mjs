@@ -17,12 +17,14 @@ async function fixture() {
   await mkdir(join(rootDir, 'bin'), { recursive: true });
   await mkdir(join(rootDir, 'src'), { recursive: true });
   await mkdir(join(rootDir, 'node_modules', 'safe-package'), { recursive: true });
+  await mkdir(join(rootDir, 'installer-macos', 'Resources'), { recursive: true });
   await mkdir(runtimeDir, { recursive: true });
   await writeFile(join(rootDir, 'bin', 'claude-desktop-mac-zh-cn.mjs'), '#!/usr/bin/env node\n');
   await writeFile(join(rootDir, 'src', 'cli.mjs'), 'export const safe = true;\n');
   await writeFile(join(rootDir, 'package.json'), '{"name":"fixture","version":"2.4.6"}\n');
   await writeFile(join(rootDir, 'package-lock.json'), '{"lockfileVersion":3}\n');
   await writeFile(join(rootDir, 'node_modules', 'safe-package', 'index.js'), 'export default true;\n');
+  await writeFile(join(rootDir, 'installer-macos', 'Resources', 'README-first-launch.txt'), 'first launch\n');
   await writeFile(join(runtimeDir, 'node-arm64'), 'arm runtime');
   await writeFile(join(runtimeDir, 'node-x64'), 'x64 runtime');
   await writeFile(executable, '#!/bin/sh\nexit 0\n');
@@ -72,4 +74,16 @@ test('copies only the package allow-list and excludes apps, build artifacts, Key
   }
   assert.equal(await exists(join(packageRoot, 'bin', 'claude-desktop-mac-zh-cn.mjs')), true);
   assert.equal(await exists(join(packageRoot, 'src', 'cli.mjs')), true);
+});
+
+test('rejects dangerous output destinations before removing anything', async () => {
+  const paths = await fixture();
+  await assert.rejects(
+    () => buildGeneratorApp({ ...paths, output: '/Applications/Claude.app' }),
+    /safe generated-app destination|refusing to remove/i,
+  );
+  await assert.rejects(
+    () => buildGeneratorApp({ ...paths, output: paths.rootDir }),
+    /safe generated-app destination|refusing to remove/i,
+  );
 });

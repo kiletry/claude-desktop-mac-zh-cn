@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { access, chmod, cp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile as defaultExecFile } from 'node:child_process';
@@ -20,6 +20,7 @@ export async function buildGeneratorApp({
   rootDir = projectDir,
 } = {}) {
   const appPath = resolve(output ?? outputDir ?? 'dist/Claude 中文生成器.app');
+  validateOutputPath(appPath, resolve(rootDir));
   if (!runtimeDir) throw new Error('Missing required --runtime-dir directory.');
   const resolvedRuntimeDir = resolve(runtimeDir);
   const runtimePaths = Object.fromEntries(await Promise.all(runtimeNames.map(async (name) => {
@@ -39,10 +40,8 @@ export async function buildGeneratorApp({
   const macOS = join(contents, 'MacOS');
   const resources = join(contents, 'Resources');
   const packageRoot = join(resources, 'runtime', 'package');
-  const firstLaunchReadme = await existingPath(
-    join(sourceRoot, 'installer-macos', 'Resources', 'README-first-launch.txt'),
-    join(projectDir, 'installer-macos', 'Resources', 'README-first-launch.txt'),
-  );
+  const firstLaunchReadme = join(sourceRoot, 'installer-macos', 'Resources', 'README-first-launch.txt');
+  await assertFile(firstLaunchReadme, 'README-first-launch.txt');
 
   await rm(appPath, { recursive: true, force: true });
   await mkdir(packageRoot, { recursive: true });
@@ -66,11 +65,20 @@ export async function buildGeneratorApp({
   return { appPath, manifestPath: join(resources, 'runtime', 'manifest.json') };
 }
 
-async function existingPath(...paths) {
-  for (const path of paths) {
-    try { await access(path); return path; } catch { /* try next candidate */ }
+function validateOutputPath(appPath, sourceRoot) {
+  const forbidden = new Set([
+    '/', '/Applications', '/Applications/Claude.app', '/Applications/Claude 中文.app',
+    sourceRoot,
+  ]);
+  if (forbidden.has(appPath) || appPath === resolve(projectDir)) {
+    throw new Error(`Refusing to remove unsafe generated-app destination: ${appPath}`);
   }
-  throw new Error('README-first-launch.txt is missing.');
+  if (appPath.endsWith('/Claude.app') || appPath.endsWith('/Claude 中文.app')) {
+    throw new Error(`Refusing to remove unsafe generated-app destination: ${appPath}`);
+  }
+  if (!appPath.endsWith('/Claude 中文生成器.app')) {
+    throw new Error(`Output must be a safe generated-app destination ending in Claude 中文生成器.app: ${appPath}`);
+  }
 }
 
 async function assertPackageInputs(rootDir) {
