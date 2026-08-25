@@ -85,7 +85,7 @@ jobs:
             installer-macos/.build/arm64-apple-macosx/release/ClaudeChineseGenerator \
             installer-macos/.build/x86_64-apple-macosx/release/ClaudeChineseGenerator \
             -output dist/ClaudeChineseGenerator-universal
-          lipo -verify_arch arm64 x86_64 dist/ClaudeChineseGenerator-universal
+          lipo dist/ClaudeChineseGenerator-universal -verify_arch arm64 x86_64
 
       - name: Build and verify release artifacts
         shell: /bin/zsh {0}
