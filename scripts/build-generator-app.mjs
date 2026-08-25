@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { chmod, cp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile as defaultExecFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -23,6 +23,7 @@ export async function buildGeneratorApp({
   validateOutputPath(appPath, resolve(rootDir));
   if (!runtimeDir) throw new Error('Missing required --runtime-dir directory.');
   const resolvedRuntimeDir = resolve(runtimeDir);
+  assertRuntimeOutsideOutput(resolvedRuntimeDir, appPath);
   const runtimePaths = Object.fromEntries(await Promise.all(runtimeNames.map(async (name) => {
     const path = join(resolvedRuntimeDir, name);
     let metadata;
@@ -68,6 +69,13 @@ export async function buildGeneratorApp({
     sourceCommit: commit,
   }, null, 2)}\n`);
   return { appPath, manifestPath: join(resources, 'runtime', 'manifest.json') };
+}
+
+function assertRuntimeOutsideOutput(runtimeDir, appPath) {
+  const pathFromOutput = relative(appPath, runtimeDir);
+  if (pathFromOutput === '' || (!pathFromOutput.startsWith('..') && !isAbsolute(pathFromOutput))) {
+    throw new Error(`Runtime directory must be outside the generated app output: ${runtimeDir}`);
+  }
 }
 
 function validateOutputPath(appPath, sourceRoot) {

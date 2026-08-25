@@ -123,6 +123,12 @@ test('patches the renamed locale registry used by newer Claude bundles', () => {
   assert.equal(patchLocaleAssets([{ path: 'shared-2.js', content: source }])[0].content.includes('"zh-CN"'), true);
 });
 
+test('patches a locale registry after Claude changes its minified variable name', () => {
+  const source = 'var xu=["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"];function Mu(e){return e&&xu.includes(e)?e:void 0}';
+  const patched = patchLocaleAssets([{ path: 'shared-2-BF65-y49.js', content: source }]);
+  assert.match(patched[0].content, /xu=\["en-US".*"zh-CN"\]/);
+});
+
 test('patches only the one asset that owns the supported locale registry', () => {
   const source = 'const Bc=["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"];';
   const result = patchLocaleAssets([
@@ -154,9 +160,24 @@ test('patches the renamed runtime functions used by Claude 1.32885', () => {
   assert.match(result, /f5e\(\)\{u5e\(`zh-CN`\)\}/);
 });
 
+test('patches the Claude 1.34493 runtime after minified symbol rotation', () => {
+  const source = 'function DXe(e){try{let t=EXe(e);return D.debug(`Switching to locale "%s"`,e),kg=t,Ag?.next(t),!0}catch(t){return D.error(`Failed to load locale ${e}: %o`,{error:t}),!1}}function OXe(e){return DXe(e)?(wo.set(`locale`,e),!0):!1}function kXe(){if(!kg){try{kg=EXe(`en-US`)}catch(e){kg=YYe({locale:`en-US`,messages:{}},SXe)}Ag=new na.BehaviorSubject(kg);try{DXe(wo.get(`locale`,TXe()))}catch(e){D.error(`Failed to determine best locale; keeping en-US fallback: %o`,{error:e})}}}';
+  const result = patchLocaleRuntime(source);
+  assert.match(result, /function DXe\(e\)\{e=`zh-CN`;try\{/);
+  assert.match(result, /function OXe\(e\)\{return DXe\(`zh-CN`\)\?\(wo\.set\(`locale`,`zh-CN`\),!0\):!1\}/);
+  assert.match(result, /try\{DXe\(`zh-CN`\)\}/);
+});
+
 test('finds the renamed runtime locale chunk in newer Claude bundles', async () => {
   const root = await mkdtemp(join(tmpdir(), 'claude-runtime-asset-'));
-  await writeFile(join(root, 'index.chunk-newhash.js'), 'function B9e(e){} function V9e(e){}');
+  await writeFile(join(root, 'index.chunk-newhash.js'), 'function B9e(e){return D.debug(`Switching to locale "%s"`,e)}function V9e(){D.error(`Failed to determine best locale; keeping en-US fallback: %o`,{})}');
+  await writeFile(join(root, 'index.chunk-other.js'), 'function other(){}');
+  assert.equal(await findRuntimeLocaleAsset(root), join(root, 'index.chunk-newhash.js'));
+});
+
+test('finds the locale runtime chunk without relying on minified function names', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'claude-runtime-asset-semantic-'));
+  await writeFile(join(root, 'index.chunk-newhash.js'), 'function DXe(e){return D.debug(`Switching to locale "%s"`,e)}function kXe(){D.error(`Failed to determine best locale; keeping en-US fallback: %o`,{})}');
   await writeFile(join(root, 'index.chunk-other.js'), 'function other(){}');
   assert.equal(await findRuntimeLocaleAsset(root), join(root, 'index.chunk-newhash.js'));
 });
@@ -209,6 +230,14 @@ test('patches the modern native menu builder used by Claude 1.32885', () => {
   assert.match(result, /Menu\.buildFromTemplate\(e\.map\(i\)\)/);
   assert.match(result, /About Claude/);
   assert.match(result, /撤销/);
+});
+
+test('patches the Claude 1.34493 native menu builder after minified symbol rotation', () => {
+  const source = 'var gDn=async()=>[await Nrn(),Vyn()];async function FZ(){let e=await gDn();return o.Menu.buildFromTemplate(e)}';
+  const result = patchNativeMenuLocale(source);
+  assert.match(result, /async function FZ\(\)\{let e=await gDn\(\);/);
+  assert.match(result, /Menu\.buildFromTemplate\(e\.map\(i\)\)/);
+  assert.match(result, /"Show Main Window":`显示主窗口`/);
 });
 
 test('builds a separately signed clone without changing the official source bundle', async () => {

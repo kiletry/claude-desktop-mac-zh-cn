@@ -92,6 +92,21 @@ test('rejects dangerous output destinations before removing anything', async () 
   );
 });
 
+test('rejects a runtime directory nested inside the output before removing it', async () => {
+  const paths = await fixture();
+  const nestedRuntime = join(paths.output, 'Contents', 'Resources', 'runtime');
+  await mkdir(nestedRuntime, { recursive: true });
+  await writeFile(join(nestedRuntime, 'node-arm64'), 'arm runtime');
+  await writeFile(join(nestedRuntime, 'node-x64'), 'x64 runtime');
+  await writeFile(join(paths.output, 'sentinel.txt'), 'must survive');
+
+  await assert.rejects(
+    () => buildGeneratorApp({ ...paths, runtimeDir: nestedRuntime, sourceCommit: 'abc123' }),
+    /runtime directory.*output/i,
+  );
+  assert.equal(await readFile(join(paths.output, 'sentinel.txt'), 'utf8'), 'must survive');
+});
+
 test('dereferences package symlinks so the generated app is self-contained', async () => {
   const paths = await fixture();
   await mkdir(join(paths.rootDir, 'node_modules', '.bin'), { recursive: true });

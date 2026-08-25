@@ -104,29 +104,31 @@ export function buildTranslationResourcePlan({ resourcesDir, sourceFiles, availa
 }
 
 export function patchLocaleRegistry(source) {
-  const targets = [
-    `Bc=${SUPPORTED_LOCALE_ARRAY}`,
-    `vv=${SUPPORTED_LOCALE_ARRAY}`,
-  ];
-  const matches = targets.flatMap((target) => [...source.matchAll(new RegExp(escapeRegExp(target), 'g'))
-    .map((match) => ({ ...match, target }))]);
+  const matches = findLocaleRegistryMatches(source);
   if (matches.length !== 1) {
     throw new CompatibilityError(`Expected exactly one supported locale registry, found ${matches.length}.`);
   }
-  const { index, target } = matches[0];
-  const offset = index + target.length;
+  const { index, match } = matches[0];
+  const offset = index + match.length;
   return `${source.slice(0, offset - 1)},"zh-CN"${source.slice(offset - 1)}`;
 }
 
 export function patchLocaleAssets(assets) {
-  const candidates = assets.filter(({ content }) =>
-    content.includes(`Bc=${SUPPORTED_LOCALE_ARRAY}`) || content.includes(`vv=${SUPPORTED_LOCALE_ARRAY}`));
+  const candidates = assets.filter(({ content }) => findLocaleRegistryMatches(content).length > 0);
   if (candidates.length !== 1) {
     throw new CompatibilityError(`Expected exactly one locale registry asset, found ${candidates.length}.`);
   }
   return assets.map((asset) => asset.path === candidates[0].path
     ? { ...asset, content: patchLocaleRegistry(asset.content) }
     : asset);
+}
+
+function findLocaleRegistryMatches(source) {
+  const pattern = new RegExp(
+    `(?<![A-Za-z0-9_$\\.])[A-Za-z_$][A-Za-z0-9_$]*=${escapeRegExp(SUPPORTED_LOCALE_ARRAY)}`,
+    'g',
+  );
+  return [...source.matchAll(pattern)].map((result) => ({ index: result.index, match: result[0] }));
 }
 
 export function patchLocaleRuntime(source) {
@@ -167,15 +169,18 @@ export function patchLocaleRuntime(source) {
       label: 'runtime locale initialization',
     },
   ];
-  let patched = source;
-  for (const { target, replacement, label } of replacements) {
-    const count = patched.split(target).length - 1;
-    if (count !== 1) {
-      throw new CompatibilityError(`Expected exactly one runtime locale patch target for ${label}, found ${count}.`);
+  if (replacements.every(({ target }) => source.includes(target))) {
+    let patched = source;
+    for (const { target, replacement, label } of replacements) {
+      const count = patched.split(target).length - 1;
+      if (count !== 1) {
+        throw new CompatibilityError(`Expected exactly one runtime locale patch target for ${label}, found ${count}.`);
+      }
+      patched = patched.replace(target, replacement);
     }
-    patched = patched.replace(target, replacement);
+    return patched;
   }
-  return patched;
+  return patchSemanticLocaleRuntime(source);
 }
 
 export async function findRuntimeLocaleAsset(buildDirectory) {
@@ -185,7 +190,8 @@ export async function findRuntimeLocaleAsset(buildDirectory) {
     if (!entry.isFile() || !/^index\.chunk-.*\.js$/.test(entry.name)) continue;
     const path = join(buildDirectory, entry.name);
     const content = await readFile(path, 'utf8');
-    if (content.includes('function B9e') && content.includes('function V9e')) candidates.push(path);
+    if (content.includes('Switching to locale "%s"')
+      && content.includes('Failed to determine best locale; keeping en-US fallback')) candidates.push(path);
   }
   if (candidates.length !== 1) {
     throw new CompatibilityError(`Expected exactly one runtime locale asset, found ${candidates.length}.`);
@@ -193,16 +199,51 @@ export async function findRuntimeLocaleAsset(buildDirectory) {
   return candidates[0];
 }
 
+function patchSemanticLocaleRuntime(source) {
+  const loaderMatches = [...source.matchAll(/function ([A-Za-z_$][A-Za-z0-9_$]*)\(e\)\{try\{(?=[\s\S]{0,800}?`Switching to locale "%s"`)/g)];
+  if (loaderMatches.length !== 1) {
+    throw new CompatibilityError(`Expected exactly one runtime locale patch target for semantic runtime locale loader, found ${loaderMatches.length}.`);
+ }
+  const loaderName = loaderMatches[0][1];
+  let patched = source.replace(
+    loaderMatches[0][0],
+    `function ${loaderName}(e){e=\`zh-CN\`;try{`,
+  );
+  const requestPattern = new RegExp(
+    'function [A-Za-z_$][A-Za-z0-9_$]*\\(e\\)\\{return ' + escapeRegExp(loaderName) + '\\(e\\)\\?\\([\\s\\S]{0,180}?\\.set\\(`locale`,e\\),!0\\):!1\\}',
+    'g',
+  );
+  const requestMatches = [...patched.matchAll(requestPattern)];
+  if (requestMatches.length !== 1) {
+    throw new CompatibilityError(`Expected exactly one runtime locale request handler, found ${requestMatches.length}.`);
+  }
+  const request = requestMatches[0][0];
+  patched = patched.replace(
+    request,
+    request.replace(`${loaderName}(e)`, `${loaderName}(\`zh-CN\`)`).replace('`locale`,e', '`locale`,`zh-CN`'),
+  );
+  const initializationPattern = new RegExp(
+    escapeRegExp(loaderName) + '\\([A-Za-z_$][A-Za-z0-9_$]*\\.get\\(`locale`,[A-Za-z_$][A-Za-z0-9_$]*\\(\\)\\)\\)',
+    'g',
+  );
+  const initializationMatches = [...patched.matchAll(initializationPattern)];
+  if (initializationMatches.length !== 1) {
+    throw new CompatibilityError(`Expected exactly one runtime locale initialization, found ${initializationMatches.length}.`);
+  }
+  return patched.replace(initializationMatches[0][0], `${loaderName}(\`zh-CN\`)`);
+}
+
 export function patchNativeMenuLocale(source) {
   const target = 'function n$(){let e=await _Sn();return o.Menu.buildFromTemplate(e)}';
   const count = source.split(target).length - 1;
   if (count === 0) {
-    const modernTarget = 'async function tQ(){let e=await BNn();return o.Menu.buildFromTemplate(e)}';
-    if (source.split(modernTarget).length - 1 !== 1) {
+    const modernMatches = [...source.matchAll(/async function ([A-Za-z_$][A-Za-z0-9_$]*)\(\)\{let e=await ([A-Za-z_$][A-Za-z0-9_$]*)\(\);return o\.Menu\.buildFromTemplate\(e\)\}/g)];
+    if (modernMatches.length !== 1) {
       throw new CompatibilityError('Expected exactly one native menu locale target, found 0.');
     }
-    const modernPatch = 'async function tQ(){let e=await BNn();const t={File:`文件`,Edit:`编辑`,View:`视图`,Window:`窗口`,Help:`帮助` ,"About Claude":`关于 Claude`,"Settings…":`设置…`,"Check for Updates…":`检查更新…`,"New Conversation":`新建对话`,"Show Main Window":`显示主窗口`,"Close Window":`关闭窗口`,"Copy URL":`复制网址`,"Reload This Page":`重新加载此页`,"Actual Size":`实际大小`,"Zoom In":`放大`,"Zoom Out":`缩小`,"Enter Full Screen":`进入全屏`,"Exit Full Screen":`退出全屏`,"Claude Help":`Claude 帮助`,"Get Support":`获取支持`,Quit:`退出`,Cancel:`取消`,Reset:`重置`,Restart:`重启`,"Show App":`显示应用`};const r={undo:`撤销`,redo:`重做`,cut:`剪切`,copy:`复制`,paste:`粘贴`,selectAll:`全选`,minimize:`最小化`,close:`关闭窗口`,front:`全部置于最前`,services:`服务`,hide:`隐藏 Claude`,hideOthers:`隐藏其他`,unhide:`显示全部`};const i=e=>{if(!e||typeof e!==`object`)return e;const n={...e};if(Array.isArray(e.submenu))n.submenu=e.submenu.map(i);if(typeof e.label===`string`)n.label=t[e.label]??e.label;else if(typeof e.role===`string`&&r[e.role])n.label=r[e.role];return n};return o.Menu.buildFromTemplate(e.map(i))}';
-    return source.replace(modernTarget, modernPatch);
+    const [, menuBuilder, templateBuilder] = modernMatches[0];
+    const modernPatch = `async function ${menuBuilder}(){let e=await ${templateBuilder}();const t={File:\`文件\`,Edit:\`编辑\`,View:\`视图\`,Window:\`窗口\`,Help:\`帮助\` ,"About Claude":\`关于 Claude\`,"Settings…":\`设置…\`,"Check for Updates…":\`检查更新…\`,"New Conversation":\`新建对话\`,"Show Main Window":\`显示主窗口\`,"Close Window":\`关闭窗口\`,"Copy URL":\`复制网址\`,"Reload This Page":\`重新加载此页\`,"Actual Size":\`实际大小\`,"Zoom In":\`放大\`,"Zoom Out":\`缩小\`,"Enter Full Screen":\`进入全屏\`,"Exit Full Screen":\`退出全屏\`,"Claude Help":\`Claude 帮助\`,"Get Support":\`获取支持\`,Quit:\`退出\`,Cancel:\`取消\`,Reset:\`重置\`,Restart:\`重启\`,"Show App":\`显示应用\`};const r={undo:\`撤销\`,redo:\`重做\`,cut:\`剪切\`,copy:\`复制\`,paste:\`粘贴\`,selectAll:\`全选\`,minimize:\`最小化\`,close:\`关闭窗口\`,front:\`全部置于最前\`,services:\`服务\`,hide:\`隐藏 Claude\`,hideOthers:\`隐藏其他\`,unhide:\`显示全部\`};const i=e=>{if(!e||typeof e!==\`object\`)return e;const n={...e};if(Array.isArray(e.submenu))n.submenu=e.submenu.map(i);if(typeof e.label===\`string\`)n.label=t[e.label]??e.label;else if(typeof e.role===\`string\`&&r[e.role])n.label=r[e.role];return n};return o.Menu.buildFromTemplate(e.map(i))}`;
+    return source.replace(modernMatches[0][0], modernPatch);
   }
   if (count !== 1) {
     throw new CompatibilityError(`Expected exactly one native menu locale target, found ${count}.`);
