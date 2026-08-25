@@ -9,7 +9,7 @@ final class NodeProcessBridgeTests: XCTestCase {
         var receivedEvents: [GeneratorEvent] = []
 
         let result = try await bridge.run(
-            arguments: ["-c", "printf '%s\\n' '{\\\"event\\\":\\\"stage_started\\\",\\\"stage\\\":\\\"copy\\\",\\\"message\\\":\\\"copying\\\"}'; printf '%s' 'token=credential_fixture_value' >&2"],
+            arguments: ["-c", "printf '%s\\n' '{\"event\":\"stage_started\",\"stage\":\"copy\",\"message\":\"copying\"}'; printf '%s' 'token=credential_fixture_value' >&2"],
             environment: ["PATH": ProcessInfo.processInfo.environment["PATH"] ?? ""],
             onEvent: { receivedEvents.append($0) }
         )

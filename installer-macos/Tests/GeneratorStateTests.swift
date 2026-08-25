@@ -61,9 +61,10 @@ final class GeneratorStateTests: XCTestCase {
     func testNonzeroExitBecomesFailedWithRedactedOutput() async {
         let sensitiveValue = "credential_fixture_value"
         let result = ProcessResult(exitCode: 9, stdout: "token=\(sensitiveValue)", stderr: "", logURL: uniqueTemporaryURL())
-        let bridge = StubBridge(error: .nonZeroExit(result))
+        let bridge = StubBridge(events: [trustedInspectionEvent()], errorsByCall: [nil, .nonZeroExit(result)])
         let viewModel = GeneratorViewModel(bridge: bridge, outputAppURL: uniqueTemporaryURL())
 
+        await viewModel.check()
         await viewModel.confirmAndGenerate()
 
         guard case let .failed(error) = viewModel.state else {
@@ -99,9 +100,11 @@ final class GeneratorStateTests: XCTestCase {
     func testCancelGenerationCancelsViewModelTask() async {
         let bridge = BlockingBridge()
         let viewModel = GeneratorViewModel(bridge: bridge, outputAppURL: uniqueTemporaryURL())
+
+        await viewModel.check()
         let generation = Task { await viewModel.confirmAndGenerate() }
 
-        await bridge.waitUntilStarted()
+        await bridge.waitUntilGenerationStarts()
         viewModel.cancelGeneration()
         await generation.value
 
@@ -130,16 +133,19 @@ final class GeneratorStateTests: XCTestCase {
 private final class StubBridge: GeneratorProcessRunning {
     let events: [GeneratorEvent]
     let error: NodeProcessBridgeError?
+    let errorsByCall: [NodeProcessBridgeError?]
     private(set) var runCallCount = 0
 
-    init(events: [GeneratorEvent] = [], error: NodeProcessBridgeError? = nil) {
+    init(events: [GeneratorEvent] = [], error: NodeProcessBridgeError? = nil, errorsByCall: [NodeProcessBridgeError?] = []) {
         self.events = events
         self.error = error
+        self.errorsByCall = errorsByCall
     }
 
     func run(arguments: [String], environment: [String: String], onEvent: @escaping (GeneratorEvent) -> Void) async throws -> ProcessResult {
         runCallCount += 1
         events.forEach(onEvent)
+        if runCallCount <= errorsByCall.count, let error = errorsByCall[runCallCount - 1] { throw error }
         if let error { throw error }
         return ProcessResult(exitCode: 0, stdout: "", stderr: "", logURL: FileManager.default.temporaryDirectory)
     }
@@ -149,16 +155,33 @@ private final class StubBridge: GeneratorProcessRunning {
 
 private final class BlockingBridge: GeneratorProcessRunning {
     private let lock = NSLock()
-    private var startedContinuation: CheckedContinuation<Void, Never>?
+    private var generationStarted = false
+    private var generationStartWaiter: CheckedContinuation<Void, Never>?
     private var cancellationContinuation: CheckedContinuation<Void, Never>?
     private(set) var wasCancelled = false
+    private var runCallCount = 0
 
     func run(arguments: [String], environment: [String: String], onEvent: @escaping (GeneratorEvent) -> Void) async throws -> ProcessResult {
-        await withCheckedContinuation { continuation in
-            lock.lock()
-            startedContinuation = continuation
-            lock.unlock()
+        lock.lock()
+        runCallCount += 1
+        let isInspection = runCallCount == 1
+        lock.unlock()
+        if isInspection {
+            onEvent(GeneratorEvent(event: "inspection_succeeded", stage: "inspection", message: "ok", value: .object([
+                "appDir": .string("/Applications/Claude.app"),
+                "bundleId": .string("com.anthropic.claudefordesktop"),
+                "version": .string("1.2.3"),
+                "signing": .object(["verified": .bool(true)]),
+                "gatekeeper": .object(["accepted": .bool(true)]),
+            ])))
+            return ProcessResult(exitCode: 0, stdout: "", stderr: "", logURL: FileManager.default.temporaryDirectory)
         }
+        let startWaiter = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            generationStarted = true
+            defer { generationStartWaiter = nil }
+            return generationStartWaiter
+        }
+        startWaiter?.resume()
         return try await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 lock.lock()
@@ -180,18 +203,15 @@ private final class BlockingBridge: GeneratorProcessRunning {
         continuation?.resume()
     }
 
-    func waitUntilStarted() async {
+    func waitUntilGenerationStarts() async {
         await withCheckedContinuation { continuation in
             lock.lock()
-            if startedContinuation == nil {
+            if generationStarted {
                 lock.unlock()
                 continuation.resume()
             } else {
-                let original = startedContinuation
-                startedContinuation = nil
+                generationStartWaiter = continuation
                 lock.unlock()
-                original?.resume()
-                continuation.resume()
             }
         }
     }
