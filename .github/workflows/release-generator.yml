@@ -33,7 +33,7 @@ jobs:
           fetch-depth: 0
 
       - name: Validate release tag
-        shell: zsh
+        shell: /bin/zsh {0}
         run: |
           [[ "$RELEASE_TAG" =~ '^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.]+)?$' ]]
           git rev-parse --verify "refs/tags/$RELEASE_TAG"
@@ -47,7 +47,7 @@ jobs:
           swift test --package-path installer-macos
 
       - name: Pack the clean CLI source archive
-        shell: zsh
+        shell: /bin/zsh {0}
         run: |
           set -euo pipefail
           mkdir -p dist/release
@@ -55,7 +55,7 @@ jobs:
           [[ "$(find dist/release -maxdepth 1 -name '*.tgz' -type f | wc -l | tr -d ' ')" == 1 ]]
 
       - name: Download and verify embedded Node runtimes
-        shell: zsh
+        shell: /bin/zsh {0}
         run: |
           set -euo pipefail
           mkdir -p dist/downloads dist/runtimes
@@ -76,7 +76,7 @@ jobs:
           install -m 0755 "$x64_dir/node-v${{ env.NODE_VERSION }}-darwin-x64/bin/node" dist/runtimes/node-x64
 
       - name: Build universal Swift generator
-        shell: zsh
+        shell: /bin/zsh {0}
         run: |
           set -euo pipefail
           swift build --configuration release --package-path installer-macos --arch arm64
@@ -88,7 +88,7 @@ jobs:
           lipo -verify_arch arm64 x86_64 dist/ClaudeChineseGenerator-universal
 
       - name: Build and verify release artifacts
-        shell: zsh
+        shell: /bin/zsh {0}
         run: |
           set -euo pipefail
           app='dist/Claude 中文生成器.app'
@@ -109,7 +109,7 @@ jobs:
           [[ "$(find dist/release -maxdepth 1 -name 'SHA256SUMS' -type f | wc -l | tr -d ' ')" == 1 ]]
 
       - name: Publish exactly the verified release files
-        shell: zsh
+        shell: /bin/zsh {0}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

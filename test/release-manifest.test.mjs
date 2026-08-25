@@ -30,6 +30,8 @@ test('release workflow verifies pinned Node runtimes and publishes exactly one D
   assert.match(workflow, /gh release create[\s\S]*dist\/release\/\*\.dmg[\s\S]*dist\/release\/\*\.tgz/);
   assert.match(workflow, /临时签名|ad-hoc signing/i);
   assert.match(workflow, /3P|Cowork/i);
+  assert.doesNotMatch(workflow, /shell:\s*zsh\s*$/m);
+  assert.match(workflow, /shell:\s*\/bin\/zsh \{0\}/);
 });
 
 test('graphical installer documentation leads with DMG and covers local operational boundaries', async () => {
