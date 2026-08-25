@@ -159,7 +159,7 @@ private final class BlockingBridge: GeneratorProcessRunning {
             startedContinuation = continuation
             lock.unlock()
         }
-        try await withTaskCancellationHandler {
+        return try await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 lock.lock()
                 cancellationContinuation = continuation
