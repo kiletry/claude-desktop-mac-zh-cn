@@ -168,6 +168,14 @@ test('patches the Claude 1.34493 runtime after minified symbol rotation', () => 
   assert.match(result, /try\{DXe\(`zh-CN`\)\}/);
 });
 
+test('patches the Claude 1.40609 runtime with locale availability guards', () => {
+  const source = 'function $0e(e){return load(e)}function e2e(e){try{let t=$0e(e);return P.debug(`Switching to locale "%s"`,e),ag=t,K0e?.next(t),!0}catch(t){return P.error(`Failed to load locale ${e}: %o`,{error:t}),!1}}function t2e(e){return Q0e(e)?e2e(e)?(Va.set(`locale`,e),!0):!1:(P.warn(`Rejected locale change to unavailable locale %o`,{locale:e}),!1)}function n2e(){if(!ag){K0e=new Aa.BehaviorSubject(ag);try{let e=Va.get(`locale`);e2e(e!==void 0&&Q0e(e)?e:X0e())}catch(e){P.error(`Failed to determine best locale; keeping en-US fallback: %o`,{error:e})}}}}';
+  const result = patchLocaleRuntime(source);
+  assert.match(result, /function e2e\(e\)\{e=`zh-CN`;try\{/);
+  assert.match(result, /Q0e\(e\)\?e2e\(`zh-CN`\)\?\(Va\.set\(`locale`,`zh-CN`\),!0\)/);
+  assert.match(result, /e2e\(`zh-CN`\)\}catch/);
+});
+
 test('finds the renamed runtime locale chunk in newer Claude bundles', async () => {
   const root = await mkdtemp(join(tmpdir(), 'claude-runtime-asset-'));
   await writeFile(join(root, 'index.chunk-newhash.js'), 'function B9e(e){return D.debug(`Switching to locale "%s"`,e)}function V9e(){D.error(`Failed to determine best locale; keeping en-US fallback: %o`,{})}');

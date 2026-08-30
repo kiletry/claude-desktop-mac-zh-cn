@@ -209,28 +209,73 @@ function patchSemanticLocaleRuntime(source) {
     loaderMatches[0][0],
     `function ${loaderName}(e){e=\`zh-CN\`;try{`,
   );
-  const requestPattern = new RegExp(
-    'function [A-Za-z_$][A-Za-z0-9_$]*\\(e\\)\\{return ' + escapeRegExp(loaderName) + '\\(e\\)\\?\\([\\s\\S]{0,180}?\\.set\\(`locale`,e\\),!0\\):!1\\}',
-    'g',
-  );
-  const requestMatches = [...patched.matchAll(requestPattern)];
-  if (requestMatches.length !== 1) {
-    throw new CompatibilityError(`Expected exactly one runtime locale request handler, found ${requestMatches.length}.`);
+  const requestFunctions = findFunctionBodies(patched).filter(({ source: body }) =>
+    body.includes(`${loaderName}(e)`) && body.includes('.set(`locale`,e)'));
+  if (requestFunctions.length !== 1) {
+    throw new CompatibilityError(`Expected exactly one runtime locale request handler, found ${requestFunctions.length}.`);
   }
-  const request = requestMatches[0][0];
-  patched = patched.replace(
-    request,
-    request.replace(`${loaderName}(e)`, `${loaderName}(\`zh-CN\`)`).replace('`locale`,e', '`locale`,`zh-CN`'),
-  );
-  const initializationPattern = new RegExp(
-    escapeRegExp(loaderName) + '\\([A-Za-z_$][A-Za-z0-9_$]*\\.get\\(`locale`,[A-Za-z_$][A-Za-z0-9_$]*\\(\\)\\)\\)',
-    'g',
-  );
-  const initializationMatches = [...patched.matchAll(initializationPattern)];
-  if (initializationMatches.length !== 1) {
-    throw new CompatibilityError(`Expected exactly one runtime locale initialization, found ${initializationMatches.length}.`);
+  const request = requestFunctions[0];
+  const requestSource = request.source
+    .replaceAll(`${loaderName}(e)`, `${loaderName}(\`zh-CN\`)`)
+    .replaceAll('`locale`,e', '`locale`,`zh-CN`');
+  patched = `${patched.slice(0, request.start)}${requestSource}${patched.slice(request.end)}`;
+
+  const initializationCalls = findNamedCalls(patched, loaderName)
+    .filter(({ start, end, source: call }) => {
+      const surroundingSource = patched.slice(Math.max(0, start - 220), end);
+      return call.includes(".get(`locale`") || surroundingSource.includes(".get(`locale`");
+    });
+  if (initializationCalls.length !== 1) {
+    throw new CompatibilityError(`Expected exactly one runtime locale initialization, found ${initializationCalls.length}.`);
   }
-  return patched.replace(initializationMatches[0][0], `${loaderName}(\`zh-CN\`)`);
+  const initialization = initializationCalls[0];
+  return `${patched.slice(0, initialization.start)}${loaderName}(\`zh-CN\`)${patched.slice(initialization.end)}`;
+}
+
+function findFunctionBodies(source) {
+  const functions = [];
+  const pattern = /function [A-Za-z_$][A-Za-z0-9_$]*\(e\)\{/g;
+  for (const match of source.matchAll(pattern)) {
+    const open = match.index + match[0].length - 1;
+    const end = findBalancedEnd(source, open, '{', '}');
+    if (end !== -1) functions.push({ start: match.index, end: end + 1, source: source.slice(match.index, end + 1) });
+  }
+  return functions;
+}
+
+function findNamedCalls(source, name) {
+  const calls = [];
+  const prefix = `${name}(`;
+  let searchFrom = 0;
+  while (true) {
+    const start = source.indexOf(prefix, searchFrom);
+    if (start === -1) break;
+    const open = start + name.length;
+    const end = findBalancedEnd(source, open, '(', ')');
+    if (end !== -1) calls.push({ start, end: end + 1, source: source.slice(start, end + 1) });
+    searchFrom = start + prefix.length;
+  }
+  return calls;
+}
+
+function findBalancedEnd(source, open, opening, closing) {
+  let depth = 0;
+  let quote = null;
+  for (let index = open; index < source.length; index += 1) {
+    const character = source[index];
+    if (quote) {
+      if (character === '\\') { index += 1; continue; }
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '\'' || character === '"' || character === '`') { quote = character; continue; }
+    if (character === opening) depth += 1;
+    if (character === closing) {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
 }
 
 export function patchNativeMenuLocale(source) {
