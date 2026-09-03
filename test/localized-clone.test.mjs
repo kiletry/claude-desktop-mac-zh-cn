@@ -176,6 +176,14 @@ test('patches the Claude 1.40609 runtime with locale availability guards', () =>
   assert.match(result, /e2e\(`zh-CN`\)\}catch/);
 });
 
+test('patches the Claude 1.44121 runtime with quoted locale calls', () => {
+  const source = 'function w3e(e){return B4e({locale:e,messages:JSON.parse((0,Gh.readFileSync)(n.default.join(v3e(),`${e}.json`),"utf8"))},g3e)}function T3e(e){try{let t=w3e(e);return N.debug(\'Switching to locale "%s"\',e),Kh=t,_3e?.next(t),!0}catch(t){return N.error(`Failed to load locale ${e}: %o`,{error:t}),!1}}function E3e(e){return C3e(e)?T3e(e)?(Na.set("locale",e),!0):!1:(N.warn("Rejected locale change to unavailable locale %o",{locale:e}),!1)}function D3e(){if(!Kh){try{Kh=w3e("en-US")}catch(e){N.error("Failed to load fallback en-US locale; using empty messages: %o",{error:e}),Kh=B4e({locale:"en-US",messages:{}},g3e)}_3e=new Sa.BehaviorSubject(Kh);try{let e=Na.get("locale");T3e(e!==void 0&&C3e(e)?e:x3e())}catch(e){N.error("Failed to determine best locale; keeping en-US fallback: %o",{error:e})}}}';
+  const result = patchLocaleRuntime(source);
+  assert.match(result, /function T3e\(e\)\{e=`zh-CN`;try\{/);
+  assert.match(result, /C3e\(e\)\?T3e\(`zh-CN`\)\?\(Na\.set\("locale","zh-CN"\),!0\)/);
+  assert.match(result, /Na\.get\("locale"\);T3e\(`zh-CN`\)/);
+});
+
 test('finds the renamed runtime locale chunk in newer Claude bundles', async () => {
   const root = await mkdtemp(join(tmpdir(), 'claude-runtime-asset-'));
   await writeFile(join(root, 'index.chunk-newhash.js'), 'function B9e(e){return D.debug(`Switching to locale "%s"`,e)}function V9e(){D.error(`Failed to determine best locale; keeping en-US fallback: %o`,{})}');

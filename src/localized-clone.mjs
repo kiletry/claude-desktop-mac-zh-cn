@@ -200,7 +200,7 @@ export async function findRuntimeLocaleAsset(buildDirectory) {
 }
 
 function patchSemanticLocaleRuntime(source) {
-  const loaderMatches = [...source.matchAll(/function ([A-Za-z_$][A-Za-z0-9_$]*)\(e\)\{try\{(?=[\s\S]{0,800}?`Switching to locale "%s"`)/g)];
+  const loaderMatches = [...source.matchAll(/function ([A-Za-z_$][A-Za-z0-9_$]*)\(e\)\{try\{(?=[\s\S]{0,800}?(?:['"`])Switching to locale "%s"(?:['"`]))/g)];
   if (loaderMatches.length !== 1) {
     throw new CompatibilityError(`Expected exactly one runtime locale patch target for semantic runtime locale loader, found ${loaderMatches.length}.`);
  }
@@ -210,20 +210,21 @@ function patchSemanticLocaleRuntime(source) {
     `function ${loaderName}(e){e=\`zh-CN\`;try{`,
   );
   const requestFunctions = findFunctionBodies(patched).filter(({ source: body }) =>
-    body.includes(`${loaderName}(e)`) && body.includes('.set(`locale`,e)'));
+    body.includes(`${loaderName}(e)`) && /\.set\(\s*(['"`])locale\1\s*,\s*e\)/.test(body));
   if (requestFunctions.length !== 1) {
     throw new CompatibilityError(`Expected exactly one runtime locale request handler, found ${requestFunctions.length}.`);
   }
   const request = requestFunctions[0];
   const requestSource = request.source
     .replaceAll(`${loaderName}(e)`, `${loaderName}(\`zh-CN\`)`)
-    .replaceAll('`locale`,e', '`locale`,`zh-CN`');
+    .replace(/\.set\(\s*(['"`])locale\1\s*,\s*e\)/, (_, quote) => `.set(${quote}locale${quote},${quote}zh-CN${quote})`);
   patched = `${patched.slice(0, request.start)}${requestSource}${patched.slice(request.end)}`;
 
   const initializationCalls = findNamedCalls(patched, loaderName)
     .filter(({ start, end, source: call }) => {
       const surroundingSource = patched.slice(Math.max(0, start - 220), end);
-      return call.includes(".get(`locale`") || surroundingSource.includes(".get(`locale`");
+      return /\.get\(\s*(['"`])locale\1/.test(call)
+        || /\.get\(\s*(['"`])locale\1/.test(surroundingSource);
     });
   if (initializationCalls.length !== 1) {
     throw new CompatibilityError(`Expected exactly one runtime locale initialization, found ${initializationCalls.length}.`);
