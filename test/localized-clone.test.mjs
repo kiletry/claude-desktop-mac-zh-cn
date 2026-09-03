@@ -246,6 +246,11 @@ test('patches the modern native menu builder used by Claude 1.32885', () => {
   assert.match(result, /Menu\.buildFromTemplate\(e\.map\(i\)\)/);
   assert.match(result, /About Claude/);
   assert.match(result, /撤销/);
+  assert.match(result, /"Command Palette…":`命令面板…`/);
+  assert.match(result, /"Open Folder…":`打开文件夹…`/);
+  assert.match(result, /pasteAndMatchStyle:`粘贴并匹配样式`/);
+  assert.match(result, /zoom:`缩放`/);
+  assert.match(result, /关于 \$\{e\.label\.slice\(6\)\}/);
 });
 
 test('patches the Claude 1.34493 native menu builder after minified symbol rotation', () => {
