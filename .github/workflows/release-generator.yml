@@ -99,7 +99,7 @@ jobs:
             --output "$app"
           npm run build:dmg -- \
             --app "$app" \
-            --output "dist/release/Claude 中文生成器-${RELEASE_TAG}-macOS.dmg"
+            --output "dist/release/Claude-${RELEASE_TAG}-macOS.dmg"
           npm run verify:generator-bundle -- "$app"
           npm run verify:generator-bundle -- --clean-check "$app"
           npm pack --pack-destination dist/release
