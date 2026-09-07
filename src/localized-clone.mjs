@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { createPackage, extractAll } from '@electron/asar';
 
 import { downloadCompatibleTranslation } from './translation-source.mjs';
+import { SETTINGS_TRANSLATIONS } from './settings-translations.mjs';
 
 const SUPPORTED_LOCALE_ARRAY = '["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"]';
 const CLONE_BUNDLE_IDENTIFIER = 'com.kiletry.claude-desktop-zh-cn';
@@ -313,16 +314,36 @@ export function patchNativeMenuLocale(source) {
   return source.replace(target, nativeMenuPatch);
 }
 
-export function buildWebTranslationMap(english, chinese) {
+export function buildWebTranslationMap(english, chinese, legacyEnglish = {}) {
   if (english === null || typeof english !== 'object' || Array.isArray(english)
-    || chinese === null || typeof chinese !== 'object' || Array.isArray(chinese)) {
+    || chinese === null || typeof chinese !== 'object' || Array.isArray(chinese)
+    || legacyEnglish === null || typeof legacyEnglish !== 'object' || Array.isArray(legacyEnglish)) {
     throw new CompatibilityError('Web translation catalogs must be objects.');
   }
   const map = {};
   for (const [key, from] of Object.entries(english)) {
     const to = chinese[key];
-    if (typeof from !== 'string' || typeof to !== 'string' || from === to || map[from] !== undefined) continue;
-    map[from] = to;
+    if (typeof from !== 'string' || map[from] !== undefined) continue;
+    if (typeof to === 'string' && to !== from) {
+      map[from] = to;
+      continue;
+    }
+    const fallback = SETTINGS_TRANSLATIONS[from];
+    if (typeof fallback === 'string' && fallback !== from) map[from] = fallback;
+  }
+  const legacyTranslations = {};
+  for (const [key, from] of Object.entries(legacyEnglish)) {
+    const to = chinese[key];
+    if (typeof from !== 'string' || typeof to !== 'string' || from === to || legacyTranslations[from] !== undefined) continue;
+    legacyTranslations[from] = to;
+  }
+  for (const from of Object.values(english)) {
+    if (typeof from !== 'string' || map[from] !== undefined) continue;
+    const legacy = legacyTranslations[from];
+    if (typeof legacy === 'string' && legacy !== from) map[from] = legacy;
+  }
+  for (const [from, to] of Object.entries(SETTINGS_TRANSLATIONS)) {
+    if (map[from] === undefined && typeof to === 'string' && to !== from) map[from] = to;
   }
   return map;
 }
@@ -394,6 +415,14 @@ export async function buildLocalizedClone({
     }
   }));
   validateTranslationPayloads(payloads);
+  let legacyEnglishCatalog = {};
+  if (typeof upstream.english === 'string') {
+    try {
+      legacyEnglishCatalog = JSON.parse(upstream.english);
+    } catch (error) {
+      throw new CompatibilityError('Upstream English translation resource is not valid JSON.', { cause: error });
+    }
+  }
 
   await mkdir(outputDir, { recursive: true });
   const stagingPath = join(outputDir, `.Claude 中文.app.tmp-${process.pid}-${Date.now()}`);
@@ -438,6 +467,7 @@ export async function buildLocalizedClone({
       resourcesDir,
       workingDir: outputDir,
       infoPlist,
+      legacyEnglishCatalog,
       execFile,
     });
     await execFile('/usr/bin/plutil', ['-replace', 'CFBundleDisplayName', '-string', 'Claude 中文', '--', infoPlist], { encoding: 'utf8' });
@@ -501,7 +531,7 @@ export async function buildLocalizedClone({
   }
 }
 
-async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, infoPlist, execFile = defaultExecFile }) {
+async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, infoPlist, legacyEnglishCatalog = {}, execFile = defaultExecFile }) {
   if (!(await exists(appAsarPath))) return false;
   const extractionPath = join(workingDir, `.Claude 中文.asar-src-${process.pid}-${Date.now()}`);
   try {
@@ -515,7 +545,7 @@ async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, inf
     const chineseCatalog = JSON.parse(await readFile(join(resourcesDir, 'ion-dist', 'i18n', 'zh-CN.json'), 'utf8'));
     await writeFile(mainViewPath, patchMainViewPreloadLocale(
       mainViewSource,
-      buildWebTranslationMap(englishCatalog, chineseCatalog),
+      buildWebTranslationMap(englishCatalog, chineseCatalog, legacyEnglishCatalog),
     ));
     await createPackage(extractionPath, appAsarPath);
     const hash = computeAsarHeaderIntegrity(await readFile(appAsarPath));

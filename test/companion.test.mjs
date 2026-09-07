@@ -53,6 +53,9 @@ test('build refreshes the OCR dictionary for the installed Claude version', asyn
       { path: 'translated-zh-CN/1.30096.1.0/ion-dist/dynamic/zh-CN.json' },
       { path: 'translated-zh-CN/1.30096.1.0/desktop-shell/zh-CN.json' },
     ] });
+    if (url.includes('/contents/translated-zh-CN/ion-dist/en-US.json')) {
+      return response({ encoding: 'base64', content: Buffer.from('{"settings":"Settings"}').toString('base64') });
+    }
     if (url.includes('/contents/translated-zh-CN/')) {
       return response({ encoding: 'base64', content: Buffer.from('{"settings":"设置"}').toString('base64') });
     }

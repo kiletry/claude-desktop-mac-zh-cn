@@ -36,7 +36,11 @@ export async function downloadCompatibleTranslation(appVersion, fetchImpl = fetc
     fetchTranslationJson(`${base}/ion-dist/dynamic/zh-CN.json?ref=${commit.sha}`, fetchImpl),
     fetchTranslationJson(`${base}/desktop-shell/zh-CN.json?ref=${commit.sha}`, fetchImpl),
   ]);
-  return { commit: commit.sha, version, files: { ion, dynamic, desktop } };
+  const english = await fetchTranslationJson(
+    `https://api.github.com/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}/contents/translated-zh-CN/ion-dist/en-US.json?ref=${commit.sha}`,
+    fetchImpl,
+  );
+  return { commit: commit.sha, version, files: { ion, dynamic, desktop }, english };
 }
 
 async function fetchJson(url, fetchImpl) {

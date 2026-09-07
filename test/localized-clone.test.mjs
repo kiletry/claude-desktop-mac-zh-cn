@@ -219,10 +219,76 @@ test('seeds the main Claude web view with the Chinese locale before page scripts
 });
 
 test('builds a deterministic English-to-Chinese web text map', () => {
-  assert.deepEqual(buildWebTranslationMap(
+  const map = buildWebTranslationMap(
     { first: 'Home', second: 'Code', third: 'Same' },
     { first: '首页', second: '代码', third: 'Same' },
-  ), { Home: '首页', Code: '代码' });
+  );
+  assert.equal(map.Home, '首页');
+  assert.equal(map.Code, '代码');
+  assert.equal(map.Same, undefined);
+});
+
+test('fills newly added Claude settings labels from the local fallback catalog', () => {
+  const map = buildWebTranslationMap(
+    {
+      first: 'Extension settings',
+      second: 'Proxy server',
+      third: 'Conversation history',
+    },
+    {},
+  );
+  assert.equal(map['Extension settings'], '扩展设置');
+  assert.equal(map['Proxy server'], '代理服务器');
+  assert.equal(map['Conversation history'], '对话历史');
+});
+
+test('fills output style labels from the local fallback catalog', () => {
+  const map = buildWebTranslationMap(
+    {
+      label: 'Output style',
+      create: 'New output style',
+      hint: 'Set the output style for this session',
+    },
+    {},
+  );
+  assert.equal(map['Output style'], '输出风格');
+  assert.equal(map['New output style'], '新建输出风格');
+  assert.equal(map['Set the output style for this session'], '设置此会话的输出风格');
+});
+
+test('reuses translations when Claude rotates message keys in a newer catalog', () => {
+  const map = buildWebTranslationMap(
+    { currentKey: 'A newly reused settings description' },
+    { oldKey: '一个重新使用的设置说明' },
+    { oldKey: 'A newly reused settings description' },
+  );
+  assert.equal(map['A newly reused settings description'], '一个重新使用的设置说明');
+});
+
+test('includes fallback translations for settings schema descriptions outside i18n catalogs', () => {
+  const map = buildWebTranslationMap({ label: 'Output style' }, {});
+  assert.equal(map['Controls the output style for assistant responses'], '控制助手回复的输出风格');
+});
+
+test('translates the latest Claude Code settings labels and descriptions', () => {
+  const map = buildWebTranslationMap({
+    font: 'Interface font',
+    fontDescription: 'Font for the Claude Code interface — menus, sidebar, and chat.',
+    outputDescription: 'How Claude structures its responses in Code sessions. Applies to new sessions; the session menu can override it for a single session.',
+    sandboxDescription: 'Runs commands from Claude Code in an isolated sandbox. Takes effect for new sessions.',
+    browserDescription: 'Claude can start your dev servers, browse the web in a built-in browser, and verify changes with screenshots, snapshots, and DOM inspection.',
+    worktreeDescription: 'Where to store Git worktrees for isolated coding sessions.',
+    dynamicDescription: 'Let Claude run multiple agents in parallel for complex tasks. Workflows can use a lot of your usage limit quickly.',
+    simulatorDescription: 'Let Claude verify your changes in the iOS Simulator on this Mac: running your app, driving it through flows, and capturing screenshots and recordings. You will be asked before Claude uses each device. When off, Claude doesn’t get its simulator tools, and you can still use the simulator in the app yourself.',
+  }, {});
+  assert.equal(map['Interface font'], '界面字体');
+  assert.equal(map['Font for the Claude Code interface — menus, sidebar, and chat.'], 'Claude Code 界面的字体——菜单、侧边栏和聊天。');
+  assert.equal(map['How Claude structures its responses in Code sessions. Applies to new sessions; the session menu can override it for a single session.'], 'Claude 在代码会话中组织回复的方式。适用于新会话；会话菜单可针对单个会话覆盖此设置。');
+  assert.equal(map['Runs commands from Claude Code in an isolated sandbox. Takes effect for new sessions.'], '在隔离沙箱中运行 Claude Code 命令。对新会话生效。');
+  assert.equal(map['Claude can start your dev servers, browse the web in a built-in browser, and verify changes with screenshots, snapshots, and DOM inspection.'], 'Claude 可以启动开发服务器、在内置浏览器中浏览网页，并通过截图、快照和 DOM 检查验证更改。');
+  assert.equal(map['Where to store Git worktrees for isolated coding sessions.'], '用于存储隔离代码会话 Git 工作树的位置。');
+  assert.equal(map['Let Claude run multiple agents in parallel for complex tasks. Workflows can use a lot of your usage limit quickly.'], '允许 Claude 为复杂任务并行运行多个代理。工作流可能会很快消耗大量用量额度。');
+  assert.equal(map['Let Claude verify your changes in the iOS Simulator on this Mac: running your app, driving it through flows, and capturing screenshots and recordings. You will be asked before Claude uses each device. When off, Claude doesn’t get its simulator tools, and you can still use the simulator in the app yourself.'], '允许 Claude 在此 Mac 的 iOS 模拟器中验证更改：运行应用、执行操作流程并捕获截图和录屏。Claude 使用每台设备前都会征求你的同意。关闭后，Claude 将无法使用模拟器工具，但你仍可在应用中自行使用模拟器。');
 });
 
 test('patches native macOS menus and role-generated submenu labels', () => {
@@ -291,6 +357,9 @@ test('builds a separately signed clone without changing the official source bund
       { path: 'translated-zh-CN/1.30096.1.0/ion-dist/dynamic/zh-CN.json' },
       { path: 'translated-zh-CN/1.30096.1.0/desktop-shell/zh-CN.json' },
     ] });
+    if (url.includes('/contents/translated-zh-CN/ion-dist/en-US.json')) {
+      return response({ encoding: 'base64', content: Buffer.from('{"hello":"Hello"}').toString('base64') });
+    }
     if (url.includes('/contents/translated-zh-CN/')) {
       return response({ encoding: 'base64', content: Buffer.from('{"hello":"你好"}').toString('base64') });
     }
