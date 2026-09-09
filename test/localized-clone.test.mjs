@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cp, mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -10,7 +10,9 @@ import {
   buildCloneEntitlements,
   buildTranslationResourcePlan,
   computeAsarHeaderIntegrity,
+  collectUntranslatedInterfaceMessages,
   buildWebTranslationMap,
+  extractDefaultMessages,
   patchNativeMenuLocale,
   patchMainViewPreloadLocale,
   patchLocaleRegistry,
@@ -20,6 +22,7 @@ import {
   selectCloneTranslationVersion,
   validateTranslationPayloads,
 } from '../src/localized-clone.mjs';
+import { INTERFACE_PASSTHROUGHS } from '../src/settings-translations.mjs';
 import { createHash } from 'node:crypto';
 
 const translationVersions = [
@@ -228,6 +231,29 @@ test('builds a deterministic English-to-Chinese web text map', () => {
   assert.equal(map.Same, undefined);
 });
 
+test('reports only static interface messages that have no usable local translation', () => {
+  const messages = [
+    'New setting',
+    'Existing setting',
+    'Existing setting',
+    '',
+    'Whitespace translation',
+    'Claude Code',
+  ];
+  const untranslated = collectUntranslatedInterfaceMessages(messages, {
+    'Existing setting': '现有设置',
+    'Whitespace translation': '  ',
+  }, INTERFACE_PASSTHROUGHS);
+  assert.deepEqual(untranslated, ['New setting', 'Whitespace translation']);
+});
+
+test('extracts distinct default messages from packaged settings assets', () => {
+  const messages = extractDefaultMessages(
+    'a({defaultMessage:"New setting",id:"one"});a({defaultMessage: "New setting",id:"two"});a({defaultMessage:"A \\u201ctitle\\u201d",id:"three"})',
+  );
+  assert.deepEqual(messages, ['New setting', 'A “title”']);
+});
+
 test('fills newly added Claude settings labels from the local fallback catalog', () => {
   const map = buildWebTranslationMap(
     {
@@ -265,6 +291,16 @@ test('reuses translations when Claude rotates message keys in a newer catalog', 
   assert.equal(map['A newly reused settings description'], '一个重新使用的设置说明');
 });
 
+test('prefers legacy translations over local fallbacks for reused English messages', () => {
+  const map = buildWebTranslationMap(
+    { reused: 'Technical details', localOnly: 'Output style' },
+    { oldReused: '旧目录译文' },
+    { oldReused: 'Technical details' },
+  );
+  assert.equal(map['Technical details'], '旧目录译文');
+  assert.equal(map['Output style'], '输出风格');
+});
+
 test('includes fallback translations for settings schema descriptions outside i18n catalogs', () => {
   const map = buildWebTranslationMap({ label: 'Output style' }, {});
   assert.equal(map['Controls the output style for assistant responses'], '控制助手回复的输出风格');
@@ -291,6 +327,27 @@ test('translates the latest Claude Code settings labels and descriptions', () =>
   assert.equal(map['Let Claude verify your changes in the iOS Simulator on this Mac: running your app, driving it through flows, and capturing screenshots and recordings. You will be asked before Claude uses each device. When off, Claude doesn’t get its simulator tools, and you can still use the simulator in the app yourself.'], '允许 Claude 在此 Mac 的 iOS 模拟器中验证更改：运行应用、执行操作流程并捕获截图和录屏。Claude 使用每台设备前都会征求你的同意。关闭后，Claude 将无法使用模拟器工具，但你仍可在应用中自行使用模拟器。');
 });
 
+test('translates newly introduced settings and menu copy from the local fallback catalog', () => {
+  const map = buildWebTranslationMap({
+    connectorDescription: 'Connectors available to Claude during each run.',
+    sandboxDescription: 'Runs commands from Claude Code in an isolated sandbox. Applies to new sessions.',
+    browserDescription: 'Browser tabs keep cookies and logins across restarts in one saved browser shared by every session and Cowork. Per session gives each Code session its own copy instead, so sessions never see each other’s logins.',
+    prefixError: 'Couldn’t save the branch prefix. Try again.',
+    closeChat: 'Close chat',
+    copyProject: 'Copy project or thread link',
+    archiveProject: 'Threads in this project will be archived and become read-only. You can unarchive the project at any time via the <link>projects page</link>.',
+    discardWarning: 'Discarding permanently deletes {count, plural, one {# uncommitted change} other {# uncommitted changes}} in this session’s worktree. The session stays archived.',
+  }, {});
+  assert.equal(map['Connectors available to Claude during each run.'], '每次运行期间可供 Claude 使用的连接器。');
+  assert.equal(map['Runs commands from Claude Code in an isolated sandbox. Applies to new sessions.'], '在隔离沙箱中运行 Claude Code 命令。适用于新会话。');
+  assert.equal(map['Browser tabs keep cookies and logins across restarts in one saved browser shared by every session and Cowork. Per session gives each Code session its own copy instead, so sessions never see each other’s logins.'], '浏览器标签页会在重启后保留 Cookie 和登录状态，并由所有会话和 Cowork 共享同一个已保存的浏览器。选择“每个会话”后，每个代码会话使用自己的副本，会话之间不会看到彼此的登录状态。');
+  assert.equal(map['Couldn’t save the branch prefix. Try again.'], '无法保存分支前缀，请重试。');
+  assert.equal(map['Close chat'], '关闭聊天');
+  assert.equal(map['Copy project or thread link'], '复制项目或线程链接');
+  assert.equal(map['Threads in this project will be archived and become read-only. You can unarchive the project at any time via the <link>projects page</link>.'], '此项目中的线程将被归档并变为只读。你可随时通过<link>项目页面</link>取消归档。');
+  assert.equal(map['Discarding permanently deletes {count, plural, one {# uncommitted change} other {# uncommitted changes}} in this session’s worktree. The session stays archived.'], '丢弃将永久删除此会话工作树中的 {count, plural, one {# 项未提交更改} other {# 项未提交更改}}。会话仍将保持归档状态。');
+});
+
 test('patches native macOS menus and role-generated submenu labels', () => {
   const source = 'function n$(){let e=await _Sn();return o.Menu.buildFromTemplate(e)}';
   const result = patchNativeMenuLocale(source);
@@ -314,6 +371,7 @@ test('patches the modern native menu builder used by Claude 1.32885', () => {
   assert.match(result, /撤销/);
   assert.match(result, /"Command Palette…":`命令面板…`/);
   assert.match(result, /"Open Folder…":`打开文件夹…`/);
+  assert.match(result, /"Close chat":"关闭聊天"/);
   assert.match(result, /pasteAndMatchStyle:`粘贴并匹配样式`/);
   assert.match(result, /zoom:`缩放`/);
   assert.match(result, /关于 \$\{e\.label\.slice\(6\)\}/);
@@ -345,7 +403,25 @@ test('builds a separately signed clone without changing the official source bund
   await writeFile(join(appDir, 'Contents', 'Frameworks', 'Claude Helper.app', 'Contents', 'Info.plist'), JSON.stringify({
     CFBundleIdentifier: 'com.anthropic.claudefordesktop.helper',
   }));
+  await writeFile(join(resourcesDir, 'ion-dist', 'i18n', 'en-US.json'), JSON.stringify({
+    general: 'General',
+    technicalDetails: 'Technical details',
+    archiveProjects: 'Archive {count, plural, one {project} other {# projects}}?',
+    archiveDetails: 'Threads in this project will be archived and become read-only. You can unarchive the project at any time via the <link>projects page</link>.',
+  }));
   await writeFile(join(resourcesDir, 'ion-dist', 'assets', 'v1', 'shared-2.js'), registry);
+  await writeFile(
+    join(resourcesDir, 'ion-dist', 'assets', 'v1', 'c71860c77-Fj5_GsGa.js'),
+    'const extensions={id:"extensions",title:a(Q,{defaultMessage:"Extensions",id:"nb2FlN/G2m"})};t({defaultMessage:"Advanced settings"});t({defaultMessage:"General"});t({defaultMessage: "Zebra setting"});t({defaultMessage:"Claude Code"});',
+  );
+  await writeFile(
+    join(resourcesDir, 'ion-dist', 'assets', 'v1', 'c71860c77-CpuCnKDC.js'),
+    'const settings=[{id:"appearance",title:1},{id:"general",title:2}];t({defaultMessage: "apple setting"});t({defaultMessage: "Äther setting"});',
+  );
+  await writeFile(
+    join(resourcesDir, 'ion-dist', 'assets', 'v1', 'c42d32d95-DHTanC_8.js'),
+    't({defaultMessage: "Non-target UI copy"});',
+  );
   await writeFile(join(appDir, 'Contents', 'MacOS', 'Claude'), 'native binary');
   const sourceRegistry = await readFile(join(resourcesDir, 'ion-dist', 'assets', 'v1', 'shared-2.js'), 'utf8');
 
@@ -361,7 +437,7 @@ test('builds a separately signed clone without changing the official source bund
       return response({ encoding: 'base64', content: Buffer.from('{"hello":"Hello"}').toString('base64') });
     }
     if (url.includes('/contents/translated-zh-CN/')) {
-      return response({ encoding: 'base64', content: Buffer.from('{"hello":"你好"}').toString('base64') });
+      return response({ encoding: 'base64', content: Buffer.from('{"hello":"你好","technicalDetails":"当前真实中文"}').toString('base64') });
     }
     throw new Error(`Unexpected URL: ${url}`);
   };
@@ -406,8 +482,17 @@ test('builds a separately signed clone without changing the official source bund
     buildCloneLauncherScript(),
   );
   assert.equal(await readFile(join(result.appPath, 'Contents', 'MacOS', 'Claude-bin'), 'utf8'), 'native binary');
-  assert.deepEqual(JSON.parse(await readFile(join(result.appPath, 'Contents', 'Resources', 'ion-dist', 'i18n', 'zh-CN.json'), 'utf8')), { hello: '你好' });
-  assert.deepEqual(JSON.parse(await readFile(join(result.appPath, 'Contents', 'Resources', 'ion-dist', 'i18n', 'dynamic', 'zh-CN.json'), 'utf8')), { hello: '你好' });
+  assert.deepEqual(JSON.parse(await readFile(join(result.appPath, 'Contents', 'Resources', 'ion-dist', 'i18n', 'zh-CN.json'), 'utf8')), {
+    hello: '你好',
+    technicalDetails: '当前真实中文',
+    general: '通用',
+    archiveProjects: '归档 {count, plural, one {项目} other {# 个项目}}？',
+    archiveDetails: '此项目中的线程将被归档并变为只读。你可随时通过<link>项目页面</link>取消归档。',
+  });
+  assert.deepEqual(JSON.parse(await readFile(join(result.appPath, 'Contents', 'Resources', 'ion-dist', 'i18n', 'dynamic', 'zh-CN.json'), 'utf8')), {
+    hello: '你好',
+    technicalDetails: '当前真实中文',
+  });
   assert.match(await readFile(join(result.appPath, 'Contents', 'Resources', 'ion-dist', 'assets', 'v1', 'shared-2.js'), 'utf8'), /"zh-CN"/);
   assert.equal(await readFile(join(resourcesDir, 'ion-dist', 'assets', 'v1', 'shared-2.js'), 'utf8'), sourceRegistry);
   assert.deepEqual(result.manifest.writes.map(({ source, destination }) => ({ source, destination })), [
@@ -415,10 +500,27 @@ test('builds a separately signed clone without changing the official source bund
     { source: 'ion', destination: 'Contents/Resources/ion-dist/i18n/zh-CN.json' },
     { source: 'dynamic', destination: 'Contents/Resources/ion-dist/i18n/dynamic/zh-CN.json' },
   ]);
-  assert.deepEqual(JSON.parse(await readFile(join(result.appPath, 'Contents', 'Resources', 'zh-CN.json'), 'utf8')), { hello: '你好' });
+  assert.deepEqual(JSON.parse(await readFile(join(result.appPath, 'Contents', 'Resources', 'zh-CN.json'), 'utf8')), {
+    hello: '你好',
+    technicalDetails: '当前真实中文',
+  });
   assert.equal(result.manifest.localeRegistryAsset, 'Contents/Resources/ion-dist/assets/v1/shared-2.js');
   assert.deepEqual(result.manifest.skipped, [{ source: 'desktop', reason: 'destination-directory-missing' }]);
+  assert.deepEqual(result.manifest.untranslatedInterfaceMessages, ['Advanced settings', 'Extensions', 'Zebra setting', 'apple setting', 'Äther setting']);
+  assert.deepEqual(result.manifest.interfaceAuditAssets, ['c71860c77-CpuCnKDC.js', 'c71860c77-Fj5_GsGa.js']);
   assert.equal(entitlementSnapshots.length, 2);
   assert.ok(entitlementSnapshots.every((snapshot) => /com\.apple\.security\.cs\.allow-jit/.test(snapshot)));
   assert.equal(calls.some(({ file, args }) => file === '/usr/bin/codesign' && args.some((arg) => arg === appDir)), false);
+
+  await rm(join(appDir, 'Contents', 'Resources', 'ion-dist', 'assets', 'v1', 'c71860c77-Fj5_GsGa.js'));
+  await assert.rejects(
+    buildLocalizedClone({
+      appDir,
+      version: '1.30096.5',
+      outputDir: join(root, 'Incomplete Applications'),
+      fetchImpl,
+      execFile,
+    }),
+    /Required static settings anchor group was not found: extension settings/,
+  );
 });

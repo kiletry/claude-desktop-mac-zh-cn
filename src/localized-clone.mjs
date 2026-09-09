@@ -5,10 +5,20 @@ import { join } from 'node:path';
 import { createPackage, extractAll } from '@electron/asar';
 
 import { downloadCompatibleTranslation } from './translation-source.mjs';
-import { SETTINGS_TRANSLATIONS } from './settings-translations.mjs';
+import { INTERFACE_PASSTHROUGHS, SETTINGS_TRANSLATIONS } from './settings-translations.mjs';
 
 const SUPPORTED_LOCALE_ARRAY = '["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"]';
 const CLONE_BUNDLE_IDENTIFIER = 'com.kiletry.claude-desktop-zh-cn';
+const STATIC_SETTINGS_ASSET_ANCHOR_GROUPS = Object.freeze([
+  Object.freeze({
+    name: 'general settings',
+    anchors: Object.freeze(['id:"appearance",title', 'id:"general",title']),
+  }),
+  Object.freeze({
+    name: 'extension settings',
+    anchors: Object.freeze(['defaultMessage:"Extensions"', 'defaultMessage:"Advanced settings"']),
+  }),
+]);
 const MINIMAL_CLONE_ENTITLEMENTS = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict><key>com.apple.security.cs.allow-jit</key><true/></dict></plist>
@@ -282,6 +292,7 @@ function findBalancedEnd(source, open, opening, closing) {
 
 export function patchNativeMenuLocale(source) {
   const target = 'function n$(){let e=await _Sn();return o.Menu.buildFromTemplate(e)}';
+  const localMenuTranslations = JSON.stringify(SETTINGS_TRANSLATIONS);
   const count = source.split(target).length - 1;
   if (count === 0) {
     const modernMatches = [...source.matchAll(/async function ([A-Za-z_$][A-Za-z0-9_$]*)\(\)\{let e=await ([A-Za-z_$][A-Za-z0-9_$]*)\(\);return o\.Menu\.buildFromTemplate\(e\)\}/g)];
@@ -289,7 +300,7 @@ export function patchNativeMenuLocale(source) {
       throw new CompatibilityError('Expected exactly one native menu locale target, found 0.');
     }
     const [, menuBuilder, templateBuilder] = modernMatches[0];
-    const modernPatch = `async function ${menuBuilder}(){let e=await ${templateBuilder}();const t={File:\`文件\`,Edit:\`编辑\`,View:\`视图\`,Window:\`窗口\`,Help:\`帮助\`,"About Claude":\`关于 Claude\`,"Settings…":\`设置…\`,"Check for Updates…":\`检查更新…\`,"New Conversation":\`新建对话\`,"Open File…":\`打开文件…\`,"Open Folder…":\`打开文件夹…\`,"Close Session":\`关闭会话\`,"Show Main Window":\`显示主窗口\`,"Copy URL":\`复制网址\`,"Reload This Page":\`重新加载此页\`,Reload:\`重新加载\`,"Actual Size":\`实际大小\`,"Actual Size (numpad)":\`实际大小\`,"Zoom In":\`放大\`,"Zoom In (indie cooler version)":\`放大\`,"Zoom In (numpad)":\`放大\`,"Zoom Out":\`缩小\`,"Zoom Out (numpad)":\`缩小\`,"Enter Full Screen":\`进入全屏\`,"Exit Full Screen":\`退出全屏\`,"Command Palette…":\`命令面板…\`,"Show Sidebar":\`显示侧边栏\`,"Hide Sidebar":\`隐藏侧边栏\`,Sidebar:\`侧边栏\`,"Split View":\`分屏视图\`,"New Session on the Right":\`在右侧新建会话\`,"New Session Below":\`在下方新建会话\`,"Focus Next Split View":\`聚焦下一个分屏\`,"Focus Previous Split View":\`聚焦上一个分屏\`,"Close Split View":\`关闭分屏\`,"Show Terminal":\`显示终端\`,"Hide Terminal":\`隐藏终端\`,Terminal:\`终端\`,"Show Diff":\`显示差异\`,"Hide Diff":\`隐藏差异\`,Diff:\`差异\`,"Show Browser":\`显示浏览器\`,"Hide Browser":\`隐藏浏览器\`,Browser:\`浏览器\`,"Show Preview":\`显示预览\`,"Hide Preview":\`隐藏预览\`,Preview:\`预览\`,"Show Side Chat":\`显示侧边聊天\`,"Hide Side Chat":\`隐藏侧边聊天\`,"Side Chat":\`侧边聊天\`,"Close Pane":\`关闭面板\`,Go:\`前往\`,Back:\`后退\`,Forward:\`前进\`,"Search…":\`搜索…\`,"Previous Chat":\`上一个聊天\`,"Next Chat":\`下一个聊天\`,"Previous Task":\`上一个任务\`,"Next Task":\`下一个任务\`,"Previous Session":\`上一个会话\`,"Next Session":\`下一个会话\`,"Claude Help":\`Claude 帮助\`,"Keyboard Shortcuts":\`键盘快捷键\`,"Get Support":\`获取支持\`,"Show App":\`显示应用\`,"App Features":\`应用功能\`,Developer:\`开发者\`,"Configure Third-Party Inference…":\`配置第三方推理…\`,Prototypes:\`原型\`,Debug:\`调试\`,Cancel:\`取消\`,Reset:\`重置\`,Restart:\`重启\`};const r={undo:\`撤销\`,redo:\`重做\`,cut:\`剪切\`,copy:\`复制\`,paste:\`粘贴\`,pasteAndMatchStyle:\`粘贴并匹配样式\`,delete:\`删除\`,selectAll:\`全选\`,minimize:\`最小化\`,zoom:\`缩放\`,close:\`关闭窗口\`,front:\`全部置于最前\`,services:\`服务\`,hide:\`隐藏 Claude\`,hideOthers:\`隐藏其他\`,unhide:\`显示全部\`};const i=e=>{if(!e||typeof e!==\`object\`)return e;const n={...e};if(Array.isArray(e.submenu))n.submenu=e.submenu.map(i);if(typeof e.label===\`string\`){const a=t[e.label]??(/^About (.+)$/.test(e.label)?\`关于 \${e.label.slice(6)}\`:undefined)??(/^Quit (.+)$/.test(e.label)?\`退出 \${e.label.slice(5)}\`:undefined);n.label=a??e.label}else if(typeof e.role===\`string\`&&r[e.role])n.label=r[e.role];return n};return o.Menu.buildFromTemplate(e.map(i))}`;
+    const modernPatch = `async function ${menuBuilder}(){let e=await ${templateBuilder}();const t={...${localMenuTranslations},File:\`文件\`,Edit:\`编辑\`,View:\`视图\`,Window:\`窗口\`,Help:\`帮助\`,"About Claude":\`关于 Claude\`,"Settings…":\`设置…\`,"Check for Updates…":\`检查更新…\`,"New Conversation":\`新建对话\`,"Open File…":\`打开文件…\`,"Open Folder…":\`打开文件夹…\`,"Close Session":\`关闭会话\`,"Show Main Window":\`显示主窗口\`,"Copy URL":\`复制网址\`,"Reload This Page":\`重新加载此页\`,Reload:\`重新加载\`,"Actual Size":\`实际大小\`,"Actual Size (numpad)":\`实际大小\`,"Zoom In":\`放大\`,"Zoom In (indie cooler version)":\`放大\`,"Zoom In (numpad)":\`放大\`,"Zoom Out":\`缩小\`,"Zoom Out (numpad)":\`缩小\`,"Enter Full Screen":\`进入全屏\`,"Exit Full Screen":\`退出全屏\`,"Command Palette…":\`命令面板…\`,"Show Sidebar":\`显示侧边栏\`,"Hide Sidebar":\`隐藏侧边栏\`,Sidebar:\`侧边栏\`,"Split View":\`分屏视图\`,"New Session on the Right":\`在右侧新建会话\`,"New Session Below":\`在下方新建会话\`,"Focus Next Split View":\`聚焦下一个分屏\`,"Focus Previous Split View":\`聚焦上一个分屏\`,"Close Split View":\`关闭分屏\`,"Show Terminal":\`显示终端\`,"Hide Terminal":\`隐藏终端\`,Terminal:\`终端\`,"Show Diff":\`显示差异\`,"Hide Diff":\`隐藏差异\`,Diff:\`差异\`,"Show Browser":\`显示浏览器\`,"Hide Browser":\`隐藏浏览器\`,Browser:\`浏览器\`,"Show Preview":\`显示预览\`,"Hide Preview":\`隐藏预览\`,Preview:\`预览\`,"Show Side Chat":\`显示侧边聊天\`,"Hide Side Chat":\`隐藏侧边聊天\`,"Side Chat":\`侧边聊天\`,"Close Pane":\`关闭面板\`,Go:\`前往\`,Back:\`后退\`,Forward:\`前进\`,"Search…":\`搜索…\`,"Previous Chat":\`上一个聊天\`,"Next Chat":\`下一个聊天\`,"Previous Task":\`上一个任务\`,"Next Task":\`下一个任务\`,"Previous Session":\`上一个会话\`,"Next Session":\`下一个会话\`,"Claude Help":\`Claude 帮助\`,"Keyboard Shortcuts":\`键盘快捷键\`,"Get Support":\`获取支持\`,"Show App":\`显示应用\`,"App Features":\`应用功能\`,Developer:\`开发者\`,"Configure Third-Party Inference…":\`配置第三方推理…\`,Prototypes:\`原型\`,Debug:\`调试\`,Cancel:\`取消\`,Reset:\`重置\`,Restart:\`重启\`};const r={undo:\`撤销\`,redo:\`重做\`,cut:\`剪切\`,copy:\`复制\`,paste:\`粘贴\`,pasteAndMatchStyle:\`粘贴并匹配样式\`,delete:\`删除\`,selectAll:\`全选\`,minimize:\`最小化\`,zoom:\`缩放\`,close:\`关闭窗口\`,front:\`全部置于最前\`,services:\`服务\`,hide:\`隐藏 Claude\`,hideOthers:\`隐藏其他\`,unhide:\`显示全部\`};const i=e=>{if(!e||typeof e!==\`object\`)return e;const n={...e};if(Array.isArray(e.submenu))n.submenu=e.submenu.map(i);if(typeof e.label===\`string\`){const a=t[e.label]??(/^About (.+)$/.test(e.label)?\`关于 \${e.label.slice(6)}\`:undefined)??(/^Quit (.+)$/.test(e.label)?\`退出 \${e.label.slice(5)}\`:undefined);n.label=a??e.label}else if(typeof e.role===\`string\`&&r[e.role])n.label=r[e.role];return n};return o.Menu.buildFromTemplate(e.map(i))}`;
     return source.replace(modernMatches[0][0], modernPatch);
   }
   if (count !== 1) {
@@ -298,6 +309,7 @@ export function patchNativeMenuLocale(source) {
   const nativeMenuPatch = [
     'function n$(){let e=await _Sn();',
     'const t={',
+    `...${localMenuTranslations},`,
     'File:`文件`,' ,
     '"About Claude":`关于 Claude`,"Settings…":`设置…`,"Check for Updates…":`检查更新…`,"New Conversation":`新建对话`,"Open File…":`打开文件…`,',
     'Edit:`编辑`,Undo:`撤销`,Redo:`重做`,Cut:`剪切`,Copy:`复制`,Paste:`粘贴`,"Select All":`全选`,Find:`查找`,"Find Next":`查找下一个`,"Find Previous":`查找上一个`,',
@@ -326,10 +338,7 @@ export function buildWebTranslationMap(english, chinese, legacyEnglish = {}) {
     if (typeof from !== 'string' || map[from] !== undefined) continue;
     if (typeof to === 'string' && to !== from) {
       map[from] = to;
-      continue;
     }
-    const fallback = SETTINGS_TRANSLATIONS[from];
-    if (typeof fallback === 'string' && fallback !== from) map[from] = fallback;
   }
   const legacyTranslations = {};
   for (const [key, from] of Object.entries(legacyEnglish)) {
@@ -346,6 +355,57 @@ export function buildWebTranslationMap(english, chinese, legacyEnglish = {}) {
     if (map[from] === undefined && typeof to === 'string' && to !== from) map[from] = to;
   }
   return map;
+}
+
+function mergeFallbackTranslations(english, chinese, translations) {
+  const merged = { ...chinese };
+  for (const [key, englishMessage] of Object.entries(english)) {
+    if (typeof englishMessage !== 'string') continue;
+    const currentTranslation = merged[key];
+    if (typeof currentTranslation === 'string'
+      && currentTranslation.trim().length > 0
+      && currentTranslation !== englishMessage) continue;
+    const fallback = translations[englishMessage];
+    if (typeof fallback === 'string' && fallback !== englishMessage) merged[key] = fallback;
+  }
+  return merged;
+}
+
+export function collectUntranslatedInterfaceMessages(messages, translations, passthroughs = INTERFACE_PASSTHROUGHS) {
+  if (!Array.isArray(messages) || translations === null || typeof translations !== 'object' || Array.isArray(translations)) {
+    throw new CompatibilityError('Interface message audit inputs must be an array and an object.');
+  }
+  if (!Array.isArray(passthroughs) && !(passthroughs instanceof Set)) {
+    throw new CompatibilityError('Interface passthroughs must be an array or set.');
+  }
+  const approved = new Set(passthroughs);
+  const untranslated = [];
+  const seen = new Set();
+  for (const message of messages) {
+    if (typeof message !== 'string' || message.trim().length === 0 || seen.has(message) || approved.has(message)) continue;
+    seen.add(message);
+    const translation = translations[message];
+    if (typeof translation !== 'string' || translation.trim().length === 0 || translation === message) untranslated.push(message);
+  }
+  return untranslated;
+}
+
+export function extractDefaultMessages(source) {
+  if (typeof source !== 'string') throw new CompatibilityError('Settings asset source must be a string.');
+  const messages = [];
+  const seen = new Set();
+  for (const match of source.matchAll(/defaultMessage\s*:\s*"((?:\\.|[^"\\])*)"/g)) {
+    let message;
+    try {
+      message = JSON.parse(`"${match[1]}"`);
+    } catch {
+      continue;
+    }
+    if (typeof message !== 'string' || seen.has(message)) continue;
+    seen.add(message);
+    messages.push(message);
+  }
+  return messages;
 }
 
 export function patchMainViewPreloadLocale(source, translations = {}) {
@@ -451,9 +511,29 @@ export async function buildLocalizedClone({
       availableDirectories,
     });
     await Promise.all(resourcePlan.writes.map(({ destination, content }) => writeFile(destination, content)));
+    const englishCatalog = JSON.parse(await readFile(join(resourcesDir, 'ion-dist', 'i18n', 'en-US.json'), 'utf8'));
+    const chineseCatalogPath = join(resourcesDir, 'ion-dist', 'i18n', 'zh-CN.json');
+    const chineseCatalog = JSON.parse(await readFile(chineseCatalogPath, 'utf8'));
+    const webTranslationMap = buildWebTranslationMap(
+      englishCatalog,
+      chineseCatalog,
+      legacyEnglishCatalog,
+    );
+    await writeFile(
+      chineseCatalogPath,
+      `${JSON.stringify(mergeFallbackTranslations(englishCatalog, chineseCatalog, webTranslationMap), null, 2)}\n`,
+    );
 
     const assetsDir = join(resourcesDir, 'ion-dist', 'assets', 'v1');
     const assets = await readJavaScriptAssets(assetsDir);
+    const auditedInterfaceAssets = collectStaticInterfaceAssets(assets);
+    const interfaceAuditAssets = auditedInterfaceAssets
+      .map(({ name }) => name)
+      .sort(compareCodeUnits);
+    const untranslatedInterfaceMessages = collectUntranslatedInterfaceMessages(
+      auditedInterfaceAssets.flatMap(({ content }) => extractDefaultMessages(content)),
+      webTranslationMap,
+    ).sort(compareCodeUnits);
     const patchedAssets = patchLocaleAssets(assets);
     const registryAsset = patchedAssets.find((asset, index) => asset.content !== assets[index].content);
     for (const asset of patchedAssets) {
@@ -467,7 +547,7 @@ export async function buildLocalizedClone({
       resourcesDir,
       workingDir: outputDir,
       infoPlist,
-      legacyEnglishCatalog,
+      translationMap: webTranslationMap,
       execFile,
     });
     await execFile('/usr/bin/plutil', ['-replace', 'CFBundleDisplayName', '-string', 'Claude 中文', '--', infoPlist], { encoding: 'utf8' });
@@ -493,6 +573,8 @@ export async function buildLocalizedClone({
       localeRegistryAsset: registryAsset?.path.slice(stagingPath.length + 1) ?? null,
       runtimeLocalePatched,
       webViewLocalePreloadPatched: runtimeLocalePatched,
+      interfaceAuditAssets,
+      untranslatedInterfaceMessages,
       userDataDirectory: '~/Library/Application Support/Claude Desktop zh-CN',
     };
     await writeFile(
@@ -531,7 +613,7 @@ export async function buildLocalizedClone({
   }
 }
 
-async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, infoPlist, legacyEnglishCatalog = {}, execFile = defaultExecFile }) {
+async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, infoPlist, translationMap, execFile = defaultExecFile }) {
   if (!(await exists(appAsarPath))) return false;
   const extractionPath = join(workingDir, `.Claude 中文.asar-src-${process.pid}-${Date.now()}`);
   try {
@@ -541,11 +623,9 @@ async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, inf
     await writeFile(runtimePath, patchNativeMenuLocale(patchLocaleRuntime(source)));
     const mainViewPath = join(extractionPath, '.vite', 'build', 'mainView.js');
     const mainViewSource = await readFile(mainViewPath, 'utf8');
-    const englishCatalog = JSON.parse(await readFile(join(resourcesDir, 'ion-dist', 'i18n', 'en-US.json'), 'utf8'));
-    const chineseCatalog = JSON.parse(await readFile(join(resourcesDir, 'ion-dist', 'i18n', 'zh-CN.json'), 'utf8'));
     await writeFile(mainViewPath, patchMainViewPreloadLocale(
       mainViewSource,
-      buildWebTranslationMap(englishCatalog, chineseCatalog, legacyEnglishCatalog),
+      translationMap,
     ));
     await createPackage(extractionPath, appAsarPath);
     const hash = computeAsarHeaderIntegrity(await readFile(appAsarPath));
@@ -562,10 +642,31 @@ async function readJavaScriptAssets(assetsDir) {
   const entries = await readdir(assetsDir, { withFileTypes: true });
   return Promise.all(entries
     .filter((entry) => entry.isFile() && entry.name.endsWith('.js'))
+    .sort((left, right) => compareCodeUnits(left.name, right.name))
     .map(async (entry) => {
       const path = join(assetsDir, entry.name);
-      return { path, content: await readFile(path, 'utf8') };
+      return { name: entry.name, path, content: await readFile(path, 'utf8') };
     }));
+}
+
+function isStaticInterfaceAsset({ content }) {
+  return STATIC_SETTINGS_ASSET_ANCHOR_GROUPS.some(({ anchors }) => anchors.every((anchor) => content.includes(anchor)));
+}
+
+function collectStaticInterfaceAssets(assets) {
+  const missingGroups = STATIC_SETTINGS_ASSET_ANCHOR_GROUPS.filter(({ anchors }) =>
+    !assets.some(({ content }) => anchors.every((anchor) => content.includes(anchor))));
+  if (missingGroups.length > 0) {
+    const names = missingGroups.map(({ name }) => name).join(', ');
+    const suffix = missingGroups.length === 1 ? '' : 's';
+    throw new CompatibilityError(`Required static settings anchor group${suffix} was not found: ${names}.`);
+  }
+  return assets.filter(isStaticInterfaceAsset);
+}
+
+function compareCodeUnits(left, right) {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
 }
 
 async function readHelperApps(frameworksDir) {
