@@ -282,6 +282,24 @@ test('fills output style labels from the local fallback catalog', () => {
   assert.equal(map['Set the output style for this session'], '设置此会话的输出风格');
 });
 
+test('translates transcript view and user profile settings labels and descriptions', () => {
+  const map = buildWebTranslationMap({
+    transcriptLabel: 'Default transcript view',
+    transcriptDescription: 'The view sessions open in. Picking a view from a session’s Transcript view menu changes only that session.',
+    profileLabel: 'User profile',
+    profileAlias: 'User-profile',
+    profileDescription: 'You can give Claude custom instructions that apply wherever this profile is attached.',
+  }, {});
+  assert.equal(map['Default transcript view'], '默认会话记录视图');
+  assert.equal(
+    map['The view sessions open in. Picking a view from a session’s Transcript view menu changes only that session.'],
+    '会话启动时打开的视图。选择会话“会话记录视图”菜单中的视图只会更改该会话。',
+  );
+  assert.equal(map['User profile'], '用户配置文件');
+  assert.equal(map['User-profile'], '用户配置文件');
+  assert.equal(map['You can give Claude custom instructions that apply wherever this profile is attached.'], '你可以为 Claude 设置自定义说明，在此配置文件适用的所有位置生效。');
+});
+
 test('reuses translations when Claude rotates message keys in a newer catalog', () => {
   const map = buildWebTranslationMap(
     { currentKey: 'A newly reused settings description' },
