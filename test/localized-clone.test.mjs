@@ -187,6 +187,14 @@ test('patches the Claude 1.44121 runtime with quoted locale calls', () => {
   assert.match(result, /Na\.get\("locale"\);T3e\(`zh-CN`\)/);
 });
 
+test('patches a semantic runtime handler nested inside another function', () => {
+  const source = 'function outer(e){function loader(e){try{let t=load(e);return log(`Switching to locale "%s"`,e),t,!0}catch(e){return!1}}function request(e){return loader(e)?(store.set("locale",e),!0):!1}function init(){loader(store.get("locale"))}}';
+  const result = patchLocaleRuntime(source);
+  assert.match(result, /function loader\(e\)\{e=`zh-CN`;try\{/);
+  assert.match(result, /function request\(e\)\{return loader\(`zh-CN`\)\?\(store\.set\("locale","zh-CN"\),!0\):!1\}/);
+  assert.match(result, /function init\(\)\{loader\(`zh-CN`\)\}/);
+});
+
 test('finds the renamed runtime locale chunk in newer Claude bundles', async () => {
   const root = await mkdtemp(join(tmpdir(), 'claude-runtime-asset-'));
   await writeFile(join(root, 'index.chunk-newhash.js'), 'function B9e(e){return D.debug(`Switching to locale "%s"`,e)}function V9e(){D.error(`Failed to determine best locale; keeping en-US fallback: %o`,{})}');
@@ -393,6 +401,13 @@ test('patches the modern native menu builder used by Claude 1.32885', () => {
   assert.match(result, /pasteAndMatchStyle:`粘贴并匹配样式`/);
   assert.match(result, /zoom:`缩放`/);
   assert.match(result, /关于 \$\{e\.label\.slice\(6\)\}/);
+});
+
+test('patches modern native menu builders after Electron namespace rotation', () => {
+  const source = 'async function AOr(){let e=await kOr();return a.Menu.buildFromTemplate(e)}';
+  const result = patchNativeMenuLocale(source);
+  assert.match(result, /async function AOr\(\)\{let e=await kOr\(\);const t=\{/);
+  assert.match(result, /return a\.Menu\.buildFromTemplate\(e\.map\(i\)\)\}/);
 });
 
 test('patches the Claude 1.34493 native menu builder after minified symbol rotation', () => {
