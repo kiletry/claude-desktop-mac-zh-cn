@@ -54,6 +54,15 @@ jobs:
           npm pack --pack-destination dist/release
           [[ "$(find dist/release -maxdepth 1 -name '*.tgz' -type f | wc -l | tr -d ' ')" == 1 ]]
 
+      - name: Build the public translation package
+        shell: /bin/zsh {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node scripts/build-translation-package.mjs --output dist/release/claude-zh-translations.json
+          test -s dist/release/claude-zh-translations.json
+
       - name: Download and verify embedded Node runtimes
         shell: /bin/zsh {0}
         run: |
@@ -96,6 +105,7 @@ jobs:
           npm run build:generator -- \
             --runtime-dir dist/runtimes \
             --executable dist/ClaudeChineseGenerator-universal \
+            --translation-package dist/release/claude-zh-translations.json \
             --output "$app"
           npm run build:dmg -- \
             --app "$app" \
@@ -103,9 +113,10 @@ jobs:
           npm run verify:generator-bundle -- "$app"
           npm run verify:generator-bundle -- --clean-check "$app"
           npm pack --pack-destination dist/release
-          (cd dist/release && shasum -a 256 *.dmg *.tgz > SHA256SUMS)
+          (cd dist/release && shasum -a 256 *.dmg *.tgz *.json > SHA256SUMS)
           [[ "$(find dist/release -maxdepth 1 -name '*.dmg' -type f | wc -l | tr -d ' ')" == 1 ]]
           [[ "$(find dist/release -maxdepth 1 -name '*.tgz' -type f | wc -l | tr -d ' ')" == 1 ]]
+          [[ "$(find dist/release -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')" == 1 ]]
           [[ "$(find dist/release -maxdepth 1 -name 'SHA256SUMS' -type f | wc -l | tr -d ' ')" == 1 ]]
 
       - name: Publish exactly the verified release files
@@ -126,6 +137,7 @@ jobs:
           gh release create "$RELEASE_TAG" \
             dist/release/*.dmg \
             dist/release/*.tgz \
+            dist/release/claude-zh-translations.json \
             dist/release/SHA256SUMS \
             --verify-tag \
             --title "Claude 中文生成器 $RELEASE_TAG" \

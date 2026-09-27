@@ -17,6 +17,7 @@ async function fixture() {
   await mkdir(join(rootDir, 'bin'), { recursive: true });
   await mkdir(join(rootDir, 'src'), { recursive: true });
   await mkdir(join(rootDir, 'node_modules', 'safe-package'), { recursive: true });
+  await mkdir(join(rootDir, 'node_modules', '.pnpm', 'minimatch@10.0.1', 'node_modules', 'minimatch'), { recursive: true });
   await mkdir(join(rootDir, 'installer-macos', 'Resources'), { recursive: true });
   await mkdir(runtimeDir, { recursive: true });
   await writeFile(join(rootDir, 'bin', 'claude-desktop-mac-zh-cn.mjs'), '#!/usr/bin/env node\n');
@@ -24,6 +25,7 @@ async function fixture() {
   await writeFile(join(rootDir, 'package.json'), '{"name":"fixture","version":"2.4.6"}\n');
   await writeFile(join(rootDir, 'package-lock.json'), '{"lockfileVersion":3}\n');
   await writeFile(join(rootDir, 'node_modules', 'safe-package', 'index.js'), 'export default true;\n');
+  await writeFile(join(rootDir, 'node_modules', '.pnpm', 'minimatch@10.0.1', 'node_modules', 'minimatch', 'package.json'), '{"name":"minimatch","version":"10.0.1"}\n');
   await writeFile(join(rootDir, 'installer-macos', 'Resources', 'README-first-launch.txt'), 'first launch\n');
   await writeFile(join(rootDir, 'installer-macos', 'Resources', 'ClaudeChineseGenerator.icns'), 'icon');
   await writeFile(join(runtimeDir, 'node-arm64'), 'arm runtime');
@@ -117,4 +119,13 @@ test('dereferences package symlinks so the generated app is self-contained', asy
   const packagedLink = join(paths.output, 'Contents', 'Resources', 'runtime', 'package', 'node_modules', '.bin', 'safe-package');
   assert.equal((await lstat(packagedLink)).isSymbolicLink(), false);
   assert.equal(await readFile(packagedLink, 'utf8'), 'export default true;\n');
+});
+
+test('copies transitive production dependencies from pnpm storage into the app package', async () => {
+  const paths = await fixture();
+  await writeFile(join(paths.rootDir, 'package.json'), '{"name":"fixture","version":"2.4.6","dependencies":{"@electron/asar":"4.3.0"}}\n');
+  await mkdir(join(paths.rootDir, 'node_modules', '.pnpm', '@electron+asar@4.3.0', 'node_modules', '@electron', 'asar'), { recursive: true });
+  await writeFile(join(paths.rootDir, 'node_modules', '.pnpm', '@electron+asar@4.3.0', 'node_modules', '@electron', 'asar', 'package.json'), '{"name":"@electron/asar","dependencies":{"minimatch":"^10.0.1"}}\n');
+  await buildGeneratorApp({ ...paths, sourceCommit: 'abc123' });
+  assert.equal(await exists(join(paths.output, 'Contents', 'Resources', 'runtime', 'package', 'node_modules', 'minimatch', 'package.json')), true);
 });

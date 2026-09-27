@@ -135,6 +135,36 @@ test('generate is the public Claude.app to Claude Chinese.app generator command'
   }]);
 });
 
+test('generation options are passed only when explicitly selected', async () => {
+  const builds = [];
+  await runCli([
+    'generate', '--app-dir', '/fixture/Claude.app', '--output-dir', '/fixture/output',
+    '--app-mode', 'official', '--translation-mode', 'safe', '--backup-dir', '/fixture/backups',
+    '--backup-policy', 'overwrite', '--backup-count', '3', '--confirm-official-modification',
+  ], {
+    inspectClaudeApp: async () => ({ bundleId: 'com.anthropic.claudefordesktop', version: '1.0', signing: { verified: true }, gatekeeper: { accepted: true } }),
+    buildLocalizedClone: async (options) => { builds.push(options); return { appPath: '/fixture/Claude.app', appMode: 'official', translationMode: 'safe' }; },
+    writeJson: () => {},
+  });
+  assert.deepEqual(builds[0], {
+    appDir: '/fixture/Claude.app', version: '1.0', outputDir: '/fixture/output', replace: false,
+    appMode: 'official', translationMode: 'safe', backupDir: '/fixture/backups', backupPolicy: 'overwrite',
+    backupCount: 3, confirmOfficialModification: true,
+  });
+});
+
+test('official mode requires explicit confirmation before the builder is called', async () => {
+  let called = false;
+  await assert.rejects(
+    runCli(['generate', '--app-mode', 'official'], {
+      inspectClaudeApp: async () => ({ bundleId: 'com.anthropic.claudefordesktop', version: '1.0', signing: { verified: true }, gatekeeper: { accepted: true } }),
+      buildLocalizedClone: async () => { called = true; },
+    }),
+    /confirm-official-modification/,
+  );
+  assert.equal(called, false);
+});
+
 test('Accessibility companion build receives the trusted installed Claude version', async () => {
   const trustedApp = {
     bundleId: 'com.anthropic.claudefordesktop',

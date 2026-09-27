@@ -7,6 +7,9 @@ Special thanks to ICERainbow666 and the claude-desktop-zh-cn community for
 maintaining the Simplified Chinese translation files used to build the local
 dictionary.
 
+Additional Simplified Chinese frontend and desktop-shell fallback entries are
+adapted from javaht/claude-desktop-zh-cn, licensed under the MIT License.
+
 This repository independently implements a local generator that checks an
 official Claude.app and, only after explicit confirmation, creates a separate
 localized copy. It never modifies, re-signs, backs up, restores, or otherwise

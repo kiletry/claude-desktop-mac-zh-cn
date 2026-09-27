@@ -1,5 +1,34 @@
 import Foundation
 
+enum AppMode: String, Codable, CaseIterable, Sendable {
+    case clone, official
+    var title: String { self == .clone ? "独立中文副本" : "修改官方 Claude" }
+}
+
+enum TranslationMode: String, Codable, CaseIterable, Sendable {
+    case full, safe
+    var title: String { self == .full ? "完整模式" : "安全模式" }
+}
+
+enum BackupPolicy: String, Codable, CaseIterable, Sendable {
+    case versioned, overwrite
+    var title: String { self == .versioned ? "版本号备份" : "覆盖备份" }
+}
+
+struct GenerationConfiguration: Equatable, Sendable {
+    var appMode: AppMode = .clone
+    var translationMode: TranslationMode = .full
+    var backupDirectory: String = ""
+    var backupPolicy: BackupPolicy = .versioned
+    var backupCount: Int = 1
+
+    var backupDirectoryURL: URL {
+        if !backupDirectory.isEmpty { return URL(fileURLWithPath: backupDirectory) }
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/ClaudeChineseGenerator/Backups")
+    }
+    var requiresOfficialConfirmation: Bool { appMode == .official }
+}
+
 enum JSONValue: Codable, Equatable, Sendable {
     case string(String)
     case bool(Bool)
@@ -94,6 +123,8 @@ struct ResultSummary: Equatable, Sendable {
     let appPath: String
     let translationVersion: String?
     let sourceCommit: String?
+    let appMode: AppMode
+    let translationMode: TranslationMode
 }
 
 struct GeneratorError: Error, Equatable, Sendable {

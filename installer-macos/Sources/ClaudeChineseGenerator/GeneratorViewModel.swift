@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 final class GeneratorViewModel: ObservableObject {
     @Published private(set) var state: GeneratorState = .checking
+    @Published var configuration = GenerationConfiguration()
 
     private let bridge: GeneratorProcessRunning
     private let outputAppURL: URL
@@ -15,6 +16,14 @@ final class GeneratorViewModel: ObservableObject {
     private var lastTrustedInspection: Inspection?
     private var generationTask: Task<Void, Never>?
     private var cancellationRequested = false
+
+    func chooseBackupDirectory() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url { configuration.backupDirectory = url.path }
+    }
 
     init(
         bridge: GeneratorProcessRunning = NodeProcessBridge(executableURL: NodeProcessBridge.bundledNodeURL),
@@ -66,7 +75,11 @@ final class GeneratorViewModel: ObservableObject {
         default:
             return
         }
-        if !replacementConfirmed && FileManager.default.fileExists(atPath: outputAppURL.path) {
+        if configuration.appMode == .official && !replacementConfirmed {
+            state = .confirmingReplacement
+            return
+        }
+        if configuration.appMode == .clone && !replacementConfirmed && FileManager.default.fileExists(atPath: outputAppURL.path) {
             state = .confirmingReplacement
             return
         }
@@ -89,8 +102,14 @@ final class GeneratorViewModel: ObservableObject {
         }
     }
 
-    func openClone() {
-        NSWorkspace.shared.open(outputAppURL)
+    func openGeneratedApp() {
+        let appURL: URL
+        if completionSummary?.appMode == .official {
+            appURL = URL(fileURLWithPath: "/Applications/Claude.app")
+        } else {
+            appURL = outputAppURL
+        }
+        NSWorkspace.shared.open(appURL)
     }
 
     func openDataDirectory() {
@@ -104,11 +123,12 @@ final class GeneratorViewModel: ObservableObject {
 
     private func generate() async {
         cancellationRequested = false
-        state = .generating(Progress(stage: "generation", message: "正在生成中文副本…"))
+        let label = configuration.appMode == .official ? "正在修改官方 Claude…" : "正在生成中文副本…"
+        state = .generating(Progress(stage: "generation", message: label))
         completionSummary = nil
         do {
             let result = try await bridge.run(
-                arguments: commandPrefix + ["generate", "--output-dir", outputAppURL.deletingLastPathComponent().path, "--replace"],
+                arguments: generationArguments,
                 environment: safeEnvironment,
                 onEvent: { [weak self] event in
                     Task { @MainActor in
@@ -151,7 +171,9 @@ final class GeneratorViewModel: ObservableObject {
             completionSummary = ResultSummary(
                 appPath: appPath,
                 translationVersion: value["translationVersion"]?.stringValue,
-                sourceCommit: value["sourceCommit"]?.stringValue
+                sourceCommit: value["sourceCommit"]?.stringValue,
+                appMode: AppMode(rawValue: value["appMode"]?.stringValue ?? "clone") ?? .clone,
+                translationMode: TranslationMode(rawValue: value["translationMode"]?.stringValue ?? "full") ?? .full
             )
         default: break
         }
@@ -178,8 +200,14 @@ final class GeneratorViewModel: ObservableObject {
 
     private var safeEnvironment: [String: String] {
         let processEnvironment = ProcessInfo.processInfo.environment
-        return ["PATH", "HOME", "LANG", "LC_ALL"].reduce(into: [:]) { result, key in
+        return ["PATH", "HOME", "LANG", "LC_ALL", "GITHUB_TOKEN"].reduce(into: [:]) { result, key in
             if let value = processEnvironment[key] { result[key] = value }
         }
+    }
+
+    private var generationArguments: [String] {
+        var arguments = commandPrefix + ["generate", "--output-dir", outputAppURL.deletingLastPathComponent().path, "--replace", "--app-mode", configuration.appMode.rawValue, "--translation-mode", configuration.translationMode.rawValue, "--backup-dir", configuration.backupDirectoryURL.path, "--backup-policy", configuration.backupPolicy.rawValue, "--backup-count", String(configuration.backupCount)]
+        if configuration.requiresOfficialConfirmation { arguments.append("--confirm-official-modification") }
+        return arguments
     }
 }

@@ -52,6 +52,31 @@ open "/Applications/Claude 中文.app"
 
 `build-localized-clone` 仍作为兼容别名保留；新脚本和文档应使用 `generate`。本工具不需要中文伴侣或辅助功能权限。
 
+生成时可以主动选择应用模式和翻译模式：
+
+```bash
+./install.sh generate --replace \
+  --app-mode clone \
+  --translation-mode full \
+  --backup-dir "$HOME/Desktop/claude-backups" \
+  --backup-policy versioned \
+  --backup-count 3
+```
+
+默认是 `clone`（生成独立的 `Claude 中文.app`）和 `full`（完整翻译）。需要直接修改官方包时必须显式确认：
+
+```bash
+./install.sh generate \
+  --app-mode official \
+  --translation-mode safe \
+  --confirm-official-modification \
+  --backup-dir "$HOME/Desktop/claude-backups" \
+  --backup-policy overwrite \
+  --backup-count 1
+```
+
+`official` 模式会先备份 `/Applications/Claude.app`，再修改官方包并进行本机临时签名，可能影响官方签名、Gatekeeper、Cowork 和自动更新。`safe` 模式写入中文资源和静态 locale/界面补丁，但跳过结构性 `app.asar` 运行时及在线页面注入。备份支持固定覆盖或按 Claude 版本和时间生成版本号备份；只会清理本工具生成的备份。
+
 ## 更新 Claude 后
 
 官方 Claude 更新后，优先重新打开图形化生成器，通过检查屏幕确认版本后点击“生成/更新
@@ -133,7 +158,7 @@ Claude 进入 3P（第三方 / AI 专用）模式。
 - 中文副本不能保证 Cowork、Claude Code、虚拟机沙箱、自动更新或需要 Anthropic 官方 Team ID 的功能可用。需要这些功能时请使用官方 Claude.app。
 - 官方应用和中文副本的登录态、Cookie、Keychain 凭据、缓存、会话及配置互不共享。副本可能需要单独登录；本工具不会复制官方 Keychain 或 OAuth 密钥。
 - Claude 更新后必须重新运行 `./install.sh generate --replace`。新版本可能改变 Electron 资源布局或压缩后的运行时代码，导致翻译补丁拒绝构建；此时应等待翻译数据或补丁适配，不要强行覆盖官方应用。
-- 翻译数据来自已致谢的第三方项目，并按已安装 Claude 版本选择最近兼容版本；低于当前版本的翻译可能仍有少量英文或菜单缺失。
+- 翻译数据会随本项目 GitHub Release 发布为 `claude-zh-translations.json`，生成器优先下载该包，普通用户不需要申请 GitHub Token；仅当 Release 包不可用时才回退到上游 GitHub API。翻译包以 [ICERainbow666/claude-desktop-zh-cn](https://github.com/ICERainbow666/claude-desktop-zh-cn) 为基础，并补充合并 [javaht/claude-desktop-zh-cn](https://github.com/javaht/claude-desktop-zh-cn) 的简体中文前端和桌面壳层词条，再按已安装 Claude 版本选择最近兼容版本；低于当前版本的翻译可能仍有少量英文或菜单缺失。
 - 当上游翻译尚未覆盖 Claude 的新设置项时，生成器会对常见的设置标题、网络、用量、扩展和运行时选项应用本地补充翻译；新增加的专有名词或动态内容仍可能保留英文。
 - 如果 Claude 只更换了 message key、英文原文没有变化，生成器会使用上游英文基准目录按原文复用已有中文翻译；因此设置项标题和描述不再受 key 变化影响。
 - Gateway 供应商必须提供 Claude Desktop 可用的 Anthropic 兼容接口和可识别的模型目录。供应商返回的模型名称、认证方式、网络可达性或请求格式不兼容时，中文副本可能无法发送消息。
@@ -153,6 +178,8 @@ GitHub 只发布本工具的源码、安装脚本和测试，不发布或内置 
 特别感谢
 [ICERainbow666/claude-desktop-zh-cn](https://github.com/ICERainbow666/claude-desktop-zh-cn)
 的作者及维护者持续提供和维护简体中文翻译数据。
+同时感谢 [javaht/claude-desktop-zh-cn](https://github.com/javaht/claude-desktop-zh-cn)
+的作者及维护者提供可补充使用的简体中文前端和桌面壳层词条。
 本项目独立开发，与 Anthropic 没有隶属或官方合作关系。
 
 ## 开发与验证

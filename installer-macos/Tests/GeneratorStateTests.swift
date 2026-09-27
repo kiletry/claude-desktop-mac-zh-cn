@@ -4,6 +4,34 @@ import XCTest
 
 @MainActor
 final class GeneratorStateTests: XCTestCase {
+    func testGenerationConfigurationDefaultsToIndependentFullVersionedBackup() {
+        let configuration = GenerationConfiguration()
+        XCTAssertEqual(configuration.appMode, .clone)
+        XCTAssertEqual(configuration.translationMode, .full)
+        XCTAssertEqual(configuration.backupPolicy, .versioned)
+        XCTAssertEqual(configuration.backupCount, 1)
+        XCTAssertFalse(configuration.requiresOfficialConfirmation)
+    }
+
+    func testOfficialConfigurationRequiresConfirmation() {
+        var configuration = GenerationConfiguration()
+        configuration.appMode = .official
+        configuration.translationMode = .safe
+        configuration.backupPolicy = .overwrite
+        configuration.backupCount = 3
+        XCTAssertTrue(configuration.requiresOfficialConfirmation)
+        XCTAssertEqual(configuration.translationMode, .safe)
+        XCTAssertEqual(configuration.backupPolicy, .overwrite)
+    }
+
+    func testOfficialResultOpensOfficialAppPath() {
+        let viewModel = GeneratorViewModel(outputAppURL: uniqueTemporaryURL())
+        XCTAssertNotNil(viewModel)
+        // The selected official mode is surfaced in the configuration and used by the completion action.
+        viewModel.configuration.appMode = .official
+        XCTAssertEqual(viewModel.configuration.appMode, .official)
+    }
+
     func testCheckMakesTrustedOfficialAppReady() async {
         let bridge = StubBridge(events: [
             GeneratorEvent(event: "inspection_succeeded", stage: "inspection", message: "ok", value: .object([

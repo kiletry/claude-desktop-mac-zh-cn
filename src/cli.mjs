@@ -13,6 +13,9 @@ const HELP = `Usage: claude-desktop-mac-zh-cn <command>
 Commands:
   status            Inspect the official Claude Desktop installation
   generate          Generate Claude 中文.app from the official Claude.app
+                    Options: --app-mode clone|official, --translation-mode full|safe,
+                    --backup-dir PATH, --backup-policy overwrite|versioned,
+                    --backup-count N, --confirm-official-modification
   build-companion   Build the separate offline companion
   launch-companion  Launch the separate offline companion
   build-localized-clone  Build an independently signed Chinese Claude copy`;
@@ -79,6 +82,9 @@ export async function runCli(argv, dependencies = {}) {
   const companionOutputDir = dependencies.outputDir ?? join(projectDir, '..', 'dist');
   const cloneOutputDir = options.outputDir ?? '/Applications';
   const isCloneCommand = command === 'generate' || command === 'build-localized-clone';
+  if (isCloneCommand && options.appMode === 'official' && options.confirmOfficialModification !== true) {
+    throw new UserError('Modifying the official Claude.app requires --confirm-official-modification.');
+  }
   const operation = command === 'build-companion'
     ? () => (dependencies.buildCompanion ?? buildCompanion)({ appDir, version: app.version, projectDir, outputDir: companionOutputDir })
     : isCloneCommand
@@ -87,6 +93,12 @@ export async function runCli(argv, dependencies = {}) {
         version: app.version,
         outputDir: cloneOutputDir,
         replace: options.replace === true,
+        ...(options.appMode === undefined ? {} : { appMode: options.appMode }),
+        ...(options.translationMode === undefined ? {} : { translationMode: options.translationMode }),
+        ...(options.backupDir === undefined ? {} : { backupDir: options.backupDir }),
+        ...(options.backupPolicy === undefined ? {} : { backupPolicy: options.backupPolicy }),
+        ...(options.backupCount === undefined ? {} : { backupCount: options.backupCount }),
+        ...(options.confirmOfficialModification === undefined ? {} : { confirmOfficialModification: options.confirmOfficialModification === true }),
       })
       : (dependencies.launchCompanion ?? (() => launchCompanion({ appPath: join(companionOutputDir, 'Claude Chinese Companion.app') })));
   if (typeof operation !== 'function') {
@@ -105,7 +117,7 @@ export async function runCli(argv, dependencies = {}) {
   try {
     emit({ event: 'stage_started', stage: 'verify', message: 'Verifying the generated app.' });
     const finalApp = await inspect(appDir, dependencies.inspectOptions);
-    assertTrustedClaude(finalApp);
+    if (options.appMode !== 'official') assertTrustedClaude(finalApp);
     emit({ event: 'stage_succeeded', stage: 'verify', message: 'Generated app verification succeeded.' });
     if ((command === 'build-companion' || isCloneCommand) && result) {
       const resultOutput = {
@@ -113,6 +125,9 @@ export async function runCli(argv, dependencies = {}) {
         translationVersion: result.translationVersion,
         sourceCommit: result.sourceCommit,
       };
+      if (result?.appMode) resultOutput.appMode = result.appMode;
+      if (result?.translationMode) resultOutput.translationMode = result.translationMode;
+      if (result?.backup) resultOutput.backup = result.backup;
       if (jsonEvents) emit({ event: 'completed', stage: 'completed', message: 'Generation completed.', value: resultOutput });
       else output(resultOutput);
     } else if (jsonEvents) {
@@ -138,6 +153,16 @@ function parseOptions(args) {
     if (arg === '--app-dir') options.appDir = args[++index];
     else if (arg === '--output-dir') options.outputDir = args[++index];
     else if (arg === '--replace') options.replace = true;
+    else if (arg === '--app-mode') options.appMode = args[++index];
+    else if (arg === '--translation-mode') options.translationMode = args[++index];
+    else if (arg === '--backup-dir') options.backupDir = args[++index];
+    else if (arg === '--backup-policy') options.backupPolicy = args[++index];
+    else if (arg === '--backup-count') {
+      const value = Number(args[++index]);
+      if (!Number.isInteger(value)) throw new UserError('--backup-count must be a positive integer.');
+      options.backupCount = value;
+    }
+    else if (arg === '--confirm-official-modification') options.confirmOfficialModification = true;
     else if (arg === '--json-events') options.jsonEvents = true;
     else throw new UserError(`Unknown option: ${arg}`);
   }

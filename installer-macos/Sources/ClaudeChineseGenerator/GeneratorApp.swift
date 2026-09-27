@@ -21,6 +21,7 @@ private struct GeneratorWindow: View {
             Text("Claude 中文生成器")
                 .font(.largeTitle.bold())
             inspectionCard
+            configurationSection
             statusSection
             limitations
             Spacer(minLength: 0)
@@ -29,15 +30,40 @@ private struct GeneratorWindow: View {
         .padding(28)
         .alert("覆盖现有中文副本？", isPresented: $replacementAlertPresented) {
             Button("取消", role: .cancel) { viewModel.dismissReplacementConfirmation() }
-            Button("确认覆盖", role: .destructive) {
+            Button(viewModel.configuration.appMode == .official ? "确认修改官方 Claude" : "确认覆盖", role: .destructive) {
                 Task { await viewModel.confirmAndGenerate() }
             }
         } message: {
-            Text("这会更新 /Applications/Claude 中文.app；不会修改官方 Claude.app。")
+            Text(viewModel.configuration.appMode == .official ? "这会备份并修改官方 /Applications/Claude.app，可能破坏官方签名、Gatekeeper、Cowork 和自动更新。" : "这会更新 /Applications/Claude 中文.app；不会修改官方 Claude.app。")
         }
         .task { await viewModel.check() }
         .onChange(of: viewModel.state) { state in
             replacementAlertPresented = state == .confirmingReplacement
+        }
+    }
+
+    private var configurationSection: some View {
+        GroupBox("生成选项") {
+            VStack(alignment: .leading, spacing: 10) {
+                Picker("应用模式", selection: $viewModel.configuration.appMode) {
+                    ForEach(AppMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                Picker("翻译模式", selection: $viewModel.configuration.translationMode) {
+                    ForEach(TranslationMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                HStack {
+                    Text("备份目录")
+                    Text(viewModel.configuration.backupDirectoryURL.path).font(.caption).lineLimit(1)
+                    Button("选择…") { viewModel.chooseBackupDirectory() }
+                }
+                Picker("备份策略", selection: $viewModel.configuration.backupPolicy) {
+                    ForEach(BackupPolicy.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                Stepper("保留备份数量：\(viewModel.configuration.backupCount)", value: $viewModel.configuration.backupCount, in: 1...99)
+                if viewModel.configuration.appMode == .official {
+                    Text("官方模式会修改原始 Claude.app，生成前必须再次确认。").font(.caption).foregroundStyle(.orange)
+                }
+            }
         }
     }
 
@@ -96,7 +122,7 @@ private struct GeneratorWindow: View {
         HStack {
             switch viewModel.state {
             case .ready, .confirmingReplacement:
-                Button("生成/更新中文副本") { Task { await viewModel.confirmAndGenerate() } }
+                Button(viewModel.configuration.appMode == .official ? "备份并修改官方 Claude" : "生成/更新中文副本") { Task { await viewModel.confirmAndGenerate() } }
                     .buttonStyle(.borderedProminent)
             case .failed:
                 Button("重新检查官方 Claude") { Task { await viewModel.check() } }
@@ -104,8 +130,8 @@ private struct GeneratorWindow: View {
             case .generating:
                 Button("取消生成", role: .destructive) { viewModel.cancelGeneration() }
             case .completed:
-                Button("打开 Claude 中文") { viewModel.openClone() }.buttonStyle(.borderedProminent)
-                Button("打开配置目录") { viewModel.openDataDirectory() }
+                Button(viewModel.configuration.appMode == .official ? "打开官方 Claude" : "打开 Claude 中文") { viewModel.openGeneratedApp() }.buttonStyle(.borderedProminent)
+                if viewModel.configuration.appMode == .clone { Button("打开配置目录") { viewModel.openDataDirectory() } }
             default:
                 ProgressView().controlSize(.small)
             }

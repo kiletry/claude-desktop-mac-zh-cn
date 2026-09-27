@@ -4,6 +4,8 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { copyProductionDependencies } from '../scripts/build-generator-app.mjs';
 import test from 'node:test';
 
 const projectRoot = fileURLToPath(new URL('..', import.meta.url));
@@ -26,7 +28,7 @@ async function createFixture() {
   await writeFile(join(official, 'Contents', 'Info.plist'), `<?xml version="1.0"?><plist><dict><key>CFBundleIdentifier</key><string>com.anthropic.claudefordesktop</string><key>CFBundleShortVersionString</key><string>1.30096.5</string></dict></plist>`);
   await cp(join(projectRoot, 'bin'), join(packaged, 'bin'), { recursive: true });
   await cp(join(projectRoot, 'src'), join(packaged, 'src'), { recursive: true });
-  await cp(join(projectRoot, 'node_modules'), join(packaged, 'node_modules'), { recursive: true, dereference: true });
+  await copyProductionDependencies({ sourceRoot: projectRoot, packageRoot: packaged });
   await writeFile(node, '#!/bin/sh\nexec "$CLEAN_CHECK_HOST_NODE" "$@"\n');
   await writeFile(x64Node, '#!/bin/sh\nexec "$CLEAN_CHECK_HOST_NODE" "$@"\n');
   await writeFile(codesign, '#!/bin/sh\ncase "$1" in -dv) echo "Signature=adhoc" >&2;; esac\nexit 0\n');

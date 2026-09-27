@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { chmod, cp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, cp, mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFile as defaultExecFile } from 'node:child_process';
@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 const execFile = promisify(defaultExecFile);
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectDir = resolve(scriptDir, '..');
-const packageEntries = ['bin', 'src', 'package.json', 'package-lock.json', 'node_modules'];
+  const packageEntries = ['bin', 'src', 'package.json'];
 const runtimeNames = ['node-arm64', 'node-x64'];
 
 export async function buildGeneratorApp({
@@ -16,6 +16,7 @@ export async function buildGeneratorApp({
   output,
   outputDir,
   executable,
+  translationPackage,
   sourceCommit,
   rootDir = projectDir,
 } = {}) {
@@ -43,6 +44,7 @@ export async function buildGeneratorApp({
   const packageRoot = join(resources, 'runtime', 'package');
   const firstLaunchReadme = join(sourceRoot, 'installer-macos', 'Resources', 'README-first-launch.txt');
   await assertFile(firstLaunchReadme, 'README-first-launch.txt');
+  if (translationPackage) await assertFile(resolve(translationPackage), 'Translation package');
 
   await rm(appPath, { recursive: true, force: true });
   await mkdir(packageRoot, { recursive: true });
@@ -51,12 +53,14 @@ export async function buildGeneratorApp({
     force: true,
     dereference: true,
   })));
+  await copyProductionDependencies({ sourceRoot, packageRoot });
   await mkdir(macOS, { recursive: true });
   await cp(swiftExecutable, join(macOS, 'ClaudeChineseGenerator'), { force: true });
   await Promise.all([
     ...runtimeNames.map((name) => cp(runtimePaths[name], join(resources, 'runtime', name), { force: true })),
     cp(firstLaunchReadme, join(resources, 'README-first-launch.txt'), { force: true }),
     cp(join(sourceRoot, 'installer-macos', 'Resources', 'ClaudeChineseGenerator.icns'), join(resources, 'ClaudeChineseGenerator.icns'), { force: true }),
+    ...(translationPackage ? [cp(resolve(translationPackage), join(resources, 'runtime', 'translation-package.json'), { force: true })] : []),
   ]);
   await Promise.all([
     chmod(join(macOS, 'ClaudeChineseGenerator'), 0o755),
@@ -69,6 +73,49 @@ export async function buildGeneratorApp({
     sourceCommit: commit,
   }, null, 2)}\n`);
   return { appPath, manifestPath: join(resources, 'runtime', 'manifest.json') };
+}
+
+export async function copyProductionDependencies({ sourceRoot, packageRoot }) {
+  const sourceNodeModules = join(sourceRoot, 'node_modules');
+  const targetNodeModules = join(packageRoot, 'node_modules');
+  const packageJson = JSON.parse(await readFile(join(sourceRoot, 'package.json'), 'utf8'));
+  await mkdir(targetNodeModules, { recursive: true });
+  // Preserve direct package links and .bin entries from npm/pnpm fixtures; dereference
+  // them so the generated app remains usable without the source checkout.
+  const directEntries = await readdir(sourceNodeModules, { withFileTypes: true }).catch(() => []);
+  for (const entry of directEntries.filter(({ name }) => name !== '.pnpm')) {
+    const source = join(sourceNodeModules, entry.name);
+    const target = join(targetNodeModules, entry.name);
+    await cp(source, target, { recursive: true, force: true, dereference: true });
+  }
+  const copied = new Set();
+  const copyDependency = async (dependencyName) => {
+    if (copied.has(dependencyName)) return;
+    copied.add(dependencyName);
+    const resolved = await resolveDependencyDirectory(dependencyName, sourceNodeModules);
+    const dependencyTarget = join(targetNodeModules, dependencyName);
+    await cp(resolved, dependencyTarget, { recursive: true, force: true, dereference: true });
+    const dependencyPackage = JSON.parse(await readFile(join(resolved, 'package.json'), 'utf8'));
+    for (const nestedName of Object.keys(dependencyPackage.dependencies ?? {})) await copyDependency(nestedName);
+  };
+  for (const dependencyName of Object.keys(packageJson.dependencies ?? {})) await copyDependency(dependencyName);
+}
+
+async function resolveDependencyDirectory(name, sourceNodeModules) {
+  const direct = join(sourceNodeModules, name);
+  if (await pathExists(direct)) return direct;
+  const hoisted = join(sourceNodeModules, '.pnpm', 'node_modules', name);
+  if (await pathExists(hoisted)) return hoisted;
+  const candidates = await readdir(join(sourceNodeModules, '.pnpm')).catch(() => []);
+  const candidate = candidates.find((entry) => entry.startsWith(`${name.replace('/', '+')}@`));
+  if (!candidate) throw new Error(`Unable to locate production dependency ${name}.`);
+  const resolved = join(sourceNodeModules, '.pnpm', candidate, 'node_modules', name);
+  if (!await pathExists(resolved)) throw new Error(`Unable to locate production dependency ${name}.`);
+  return resolved;
+}
+
+async function pathExists(path) {
+  try { await stat(path); return true; } catch { return false; }
 }
 
 function assertRuntimeOutsideOutput(runtimeDir, appPath) {
@@ -95,7 +142,7 @@ function validateOutputPath(appPath, sourceRoot) {
 }
 
 async function assertPackageInputs(rootDir) {
-  await Promise.all(packageEntries.map((entry) => assertFileOrDirectory(join(rootDir, entry), `Package input ${entry}`)));
+  await Promise.all([...packageEntries, 'node_modules'].map((entry) => assertFileOrDirectory(join(rootDir, entry), `Package input ${entry}`)));
 }
 
 async function assertFile(path, name) {
@@ -136,6 +183,7 @@ function parseArguments(argv) {
     if (option === '--runtime-dir') options.runtimeDir = argv[++index];
     else if (option === '--output' || option === '--output-dir') options.output = argv[++index];
     else if (option === '--executable') options.executable = argv[++index];
+    else if (option === '--translation-package') options.translationPackage = argv[++index];
     else throw new Error(`Unknown option: ${option}`);
   }
   return options;

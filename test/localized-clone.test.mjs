@@ -126,6 +126,12 @@ test('patches the renamed locale registry used by newer Claude bundles', () => {
   assert.equal(patchLocaleAssets([{ path: 'shared-2.js', content: source }])[0].content.includes('"zh-CN"'), true);
 });
 
+test('patches multiple locale registries owned by one current Claude asset', () => {
+  const source = 'const A=["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"];const B=["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"];';
+  const patched = patchLocaleAssets([{ path: 'shared-2.js', content: source }])[0].content;
+  assert.equal((patched.match(/"zh-CN"/g) ?? []).length, 2);
+});
+
 test('patches a locale registry after Claude changes its minified variable name', () => {
   const source = 'var xu=["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"];function Mu(e){return e&&xu.includes(e)?e:void 0}';
   const patched = patchLocaleAssets([{ path: 'shared-2-BF65-y49.js', content: source }]);
@@ -153,6 +159,13 @@ test('forces the packaged runtime to keep the Chinese locale after web app reque
   assert.match(result, /function V9e\(e\)\{return B9e\(`zh-CN`\)\?\(Sl\.set\(`locale`,`zh-CN`\),!0\):!1\}/);
   assert.match(result, /try\{B9e\(`zh-CN`\)\}/);
   assert.throws(() => patchLocaleRuntime('function V9e(e){}'), /runtime locale patch target/i);
+});
+
+test('patches the current runtime locale handler with a temporary locale variable', () => {
+  const source = 'function lat(e){try{return Zg=cat(e),N.debug(\'Switching to locale "%s"\',e),Qg=e,!0}catch(e){return!1}}function uat(e){let t=e;if(e!==Qg&&!lat(t))return!1;return t!==tat&&(Fo.set("locale",t),tat=t),!0}function dat(){try{let e=Fo.get("locale");tat=e,lat(e!==void 0?e:aat())}catch(e){}}';
+  const patched = patchLocaleRuntime(source);
+  assert.match(patched, /uat\(e\).*lat\(`zh-CN`\)/);
+  assert.match(patched, /Fo\.set\("locale","zh-CN"\)/);
 });
 
 test('patches the renamed runtime functions used by Claude 1.32885', () => {
@@ -541,7 +554,7 @@ test('builds a separately signed clone without changing the official source bund
   assert.deepEqual(result.manifest.skipped, [{ source: 'desktop', reason: 'destination-directory-missing' }]);
   assert.deepEqual(result.manifest.untranslatedInterfaceMessages, ['Advanced settings', 'Extensions', 'Zebra setting', 'apple setting', 'Äther setting']);
   assert.deepEqual(result.manifest.interfaceAuditAssets, ['c71860c77-CpuCnKDC.js', 'c71860c77-Fj5_GsGa.js']);
-  assert.equal(entitlementSnapshots.length, 2);
+  assert.equal(entitlementSnapshots.length, 3);
   assert.ok(entitlementSnapshots.every((snapshot) => /com\.apple\.security\.cs\.allow-jit/.test(snapshot)));
   assert.equal(calls.some(({ file, args }) => file === '/usr/bin/codesign' && args.some((arg) => arg === appDir)), false);
 

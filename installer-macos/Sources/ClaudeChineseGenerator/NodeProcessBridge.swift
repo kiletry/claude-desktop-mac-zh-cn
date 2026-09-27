@@ -137,6 +137,7 @@ final class NodeProcessBridge: GeneratorProcessRunning, @unchecked Sendable {
 
     private func sanitizedEnvironment(_ environment: [String: String]) -> [String: String] {
         var safe = environment.filter { key, _ in
+            if key == "GITHUB_TOKEN" { return true }
             let name = key.lowercased()
             return !["token", "secret", "password", "credential", "cookie", "apikey", "api_key", "oauth"].contains { name.contains($0) }
         }
@@ -146,6 +147,9 @@ final class NodeProcessBridge: GeneratorProcessRunning, @unchecked Sendable {
             ?? FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("Library/Application Support/Claude Desktop zh-CN")
                 .path
+        if let bundledPackage = Bundle.main.url(forResource: "translation-package", withExtension: "json", subdirectory: "runtime") {
+            safe["CLAUDE_ZH_TRANSLATION_PACKAGE"] = bundledPackage.path
+        }
         return safe
     }
 }

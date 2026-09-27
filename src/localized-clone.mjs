@@ -1,11 +1,12 @@
 import { CompatibilityError, UserError } from './errors.mjs';
 import { createHash } from 'node:crypto';
 import { access, chmod, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { createPackage, extractAll } from '@electron/asar';
 
 import { downloadCompatibleTranslation } from './translation-source.mjs';
 import { INTERFACE_PASSTHROUGHS, SETTINGS_TRANSLATIONS } from './settings-translations.mjs';
+import { createBackup, normalizeGenerationOptions } from './backup-manager.mjs';
 
 const SUPPORTED_LOCALE_ARRAY = '["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"]';
 const CLONE_BUNDLE_IDENTIFIER = 'com.kiletry.claude-desktop-zh-cn';
@@ -130,8 +131,21 @@ export function patchLocaleAssets(assets) {
     throw new CompatibilityError(`Expected exactly one locale registry asset, found ${candidates.length}.`);
   }
   return assets.map((asset) => asset.path === candidates[0].path
-    ? { ...asset, content: patchLocaleRegistry(asset.content) }
+    ? { ...asset, content: patchLocaleRegistries(asset.content) }
     : asset);
+}
+
+function patchLocaleRegistries(source) {
+  const matches = findLocaleRegistryMatches(source);
+  if (matches.length === 0) {
+    throw new CompatibilityError('Expected at least one supported locale registry.');
+  }
+  let patched = source;
+  for (const { index, match } of [...matches].reverse()) {
+    const offset = index + match.length;
+    patched = `${patched.slice(0, offset - 1)},"zh-CN"${patched.slice(offset - 1)}`;
+  }
+  return patched;
 }
 
 function findLocaleRegistryMatches(source) {
@@ -221,7 +235,8 @@ function patchSemanticLocaleRuntime(source) {
     `function ${loaderName}(e){e=\`zh-CN\`;try{`,
   );
   const requestCandidates = findFunctionBodies(patched).filter(({ source: body }) =>
-    body.includes(`${loaderName}(e)`) && /\.set\(\s*(['"`])locale\1\s*,\s*e\)/.test(body));
+    new RegExp(`${escapeRegExp(loaderName)}\\([A-Za-z_$][A-Za-z0-9_$]*\\)`).test(body)
+      && /\.set\(\s*(['"`])locale\1\s*,\s*[A-Za-z_$][A-Za-z0-9_$]*\s*\)/.test(body));
   const requestFunctions = requestCandidates.filter((candidate) =>
     !requestCandidates.some((other) => other !== candidate
       && other.start >= candidate.start
@@ -231,8 +246,8 @@ function patchSemanticLocaleRuntime(source) {
   }
   const request = requestFunctions[0];
   const requestSource = request.source
-    .replaceAll(`${loaderName}(e)`, `${loaderName}(\`zh-CN\`)`)
-    .replace(/\.set\(\s*(['"`])locale\1\s*,\s*e\)/, (_, quote) => `.set(${quote}locale${quote},${quote}zh-CN${quote})`);
+    .replace(new RegExp(`${escapeRegExp(loaderName)}\\([A-Za-z_$][A-Za-z0-9_$]*\\)`, 'g'), `${loaderName}(\`zh-CN\`)`)
+    .replace(/\.set\(\s*(['"`])locale\1\s*,\s*[A-Za-z_$][A-Za-z0-9_$]*\s*\)/, (_, quote) => `.set(${quote}locale${quote},${quote}zh-CN${quote})`);
   patched = `${patched.slice(0, request.start)}${requestSource}${patched.slice(request.end)}`;
 
   const initializationCalls = findNamedCalls(patched, loaderName)
@@ -463,11 +478,20 @@ export async function buildLocalizedClone({
   fetchImpl = fetch,
   execFile = defaultExecFile,
   replace = false,
+  appMode,
+  translationMode,
+  backupDir,
+  backupPolicy,
+  backupCount,
+  confirmOfficialModification = false,
 }) {
-  const clonePath = join(outputDir, 'Claude 中文.app');
-  if (clonePath === appDir) throw new UserError('The clone destination must differ from the official Claude.app.');
-  if (await exists(clonePath) && !replace) {
-    throw new UserError(`Clone already exists: ${clonePath}; pass --replace to rebuild it.`);
+  const generationOptions = normalizeGenerationOptions({ appMode, translationMode, backupDir, backupPolicy, backupCount });
+  const targetPath = generationOptions.appMode === 'official' ? appDir : join(outputDir, 'Claude 中文.app');
+  if (generationOptions.appMode === 'clone') {
+    if (targetPath === appDir) throw new UserError('The clone destination must differ from the official Claude.app.');
+    if (await exists(targetPath) && !replace) throw new UserError(`Clone already exists: ${targetPath}; pass --replace to rebuild it.`);
+  } else if (!confirmOfficialModification) {
+    throw new UserError('Modifying the official Claude.app requires --confirm-official-modification.');
   }
 
   const upstream = await downloadCompatibleTranslation(version, fetchImpl);
@@ -489,17 +513,32 @@ export async function buildLocalizedClone({
   }
 
   await mkdir(outputDir, { recursive: true });
-  const stagingPath = join(outputDir, `.Claude 中文.app.tmp-${process.pid}-${Date.now()}`);
-  const entitlementsPath = join(outputDir, `.Claude 中文.entitlements-${process.pid}-${Date.now()}.plist`);
+  const stagingRoot = generationOptions.appMode === 'official' ? dirname(appDir) : outputDir;
+  const stagingPath = join(stagingRoot, `.Claude 中文.app.tmp-${process.pid}-${Date.now()}`);
+  const entitlementsPath = join(stagingRoot, `.Claude 中文.entitlements-${process.pid}-${Date.now()}.plist`);
+  let previousPath = null;
+  let officialReplaced = false;
   try {
     await execFile('/usr/bin/ditto', ['--', appDir, stagingPath], { encoding: 'utf8' });
+    const backupSource = generationOptions.appMode === 'official' ? appDir : targetPath;
+    const backup = generationOptions.appMode === 'official' || await exists(targetPath)
+      ? await createBackup({
+        sourcePath: backupSource,
+        backupDir: generationOptions.backupDir,
+        policy: generationOptions.backupPolicy,
+        count: generationOptions.backupCount,
+        metadata: { appVersion: version, appMode: generationOptions.appMode, translationMode: generationOptions.translationMode },
+      })
+      : null;
     const resourcesDir = join(stagingPath, 'Contents', 'Resources');
     const executableDir = join(stagingPath, 'Contents', 'MacOS');
     const executablePath = join(executableDir, 'Claude');
     const nativeExecutablePath = join(executableDir, 'Claude-bin');
-    await rename(executablePath, nativeExecutablePath);
-    await writeFile(executablePath, buildCloneLauncherScript(), { mode: 0o755 });
-    await chmod(executablePath, 0o755);
+    if (generationOptions.appMode === 'clone') {
+      await rename(executablePath, nativeExecutablePath);
+      await writeFile(executablePath, buildCloneLauncherScript(), { mode: 0o755 });
+      await chmod(executablePath, 0o755);
+    }
     const availableDirectories = new Set();
     for (const directory of [
       resourcesDir,
@@ -546,24 +585,28 @@ export async function buildLocalizedClone({
     }
 
     const infoPlist = join(stagingPath, 'Contents', 'Info.plist');
-    const runtimeLocalePatched = await patchPackagedRuntime({
-      appAsarPath: join(resourcesDir, 'app.asar'),
-      resourcesDir,
-      workingDir: outputDir,
-      infoPlist,
-      translationMap: webTranslationMap,
-      execFile,
-    });
-    await execFile('/usr/bin/plutil', ['-replace', 'CFBundleDisplayName', '-string', 'Claude 中文', '--', infoPlist], { encoding: 'utf8' });
-    await execFile('/usr/bin/plutil', ['-replace', 'CFBundleIdentifier', '-string', CLONE_BUNDLE_IDENTIFIER, '--', infoPlist], { encoding: 'utf8' });
+    const runtimeLocalePatched = generationOptions.translationMode === 'full'
+      ? await patchPackagedRuntime({
+        appAsarPath: join(resourcesDir, 'app.asar'),
+        resourcesDir,
+        workingDir: stagingRoot,
+        infoPlist,
+        translationMap: webTranslationMap,
+        execFile,
+      })
+      : false;
+    if (generationOptions.appMode === 'clone') {
+      await execFile('/usr/bin/plutil', ['-replace', 'CFBundleDisplayName', '-string', 'Claude 中文', '--', infoPlist], { encoding: 'utf8' });
+      await execFile('/usr/bin/plutil', ['-replace', 'CFBundleIdentifier', '-string', CLONE_BUNDLE_IDENTIFIER, '--', infoPlist], { encoding: 'utf8' });
+    }
+    await writeFile(entitlementsPath, buildCloneEntitlements());
     const helperApps = await readHelperApps(join(stagingPath, 'Contents', 'Frameworks'));
     for (const helperApp of helperApps) {
-      await execFile('/usr/bin/plutil', [
+      if (generationOptions.appMode === 'clone') await execFile('/usr/bin/plutil', [
         '-replace', 'CFBundleIdentifier', '-string', `${CLONE_BUNDLE_IDENTIFIER}.helper`, '--', helperApp.infoPlist,
       ], { encoding: 'utf8' });
-      await execFile('/usr/bin/codesign', [
-        '--force', '--sign', '-', '--timestamp=none', '--preserve-metadata=entitlements', helperApp.appPath,
-      ], { encoding: 'utf8' });
+      const helperSignArgs = ['--force', '--sign', '-', '--timestamp=none', '--entitlements', entitlementsPath, helperApp.appPath];
+      await execFile('/usr/bin/codesign', helperSignArgs, { encoding: 'utf8' });
     }
     const manifest = {
       appVersion: version,
@@ -580,39 +623,60 @@ export async function buildLocalizedClone({
       interfaceAuditAssets,
       untranslatedInterfaceMessages,
       userDataDirectory: '~/Library/Application Support/Claude Desktop zh-CN',
+      appMode: generationOptions.appMode,
+      translationMode: generationOptions.translationMode,
+      backup,
     };
     await writeFile(
       join(stagingPath, 'Contents', 'Resources', 'claude-desktop-mac-zh-cn-manifest.json'),
       `${JSON.stringify(manifest, null, 2)}\n`,
     );
-    await writeFile(entitlementsPath, buildCloneEntitlements());
-    await execFile('/usr/bin/codesign', [
-      '--force', '--sign', '-', '--timestamp=none', '--entitlements', entitlementsPath, nativeExecutablePath,
-    ], { encoding: 'utf8' });
-    await execFile('/usr/bin/codesign', [
-      '--force', '--sign', '-', '--timestamp=none', '--entitlements', entitlementsPath, stagingPath,
-    ], { encoding: 'utf8' });
+    if (generationOptions.appMode === 'clone') {
+      await execFile('/usr/bin/codesign', [
+        '--force', '--sign', '-', '--timestamp=none', '--entitlements', entitlementsPath, nativeExecutablePath,
+      ], { encoding: 'utf8' });
+    }
+    const appSignArgs = generationOptions.appMode === 'clone'
+      ? ['--force', '--sign', '-', '--timestamp=none', '--entitlements', entitlementsPath, stagingPath]
+      : ['--force', '--sign', '-', '--timestamp=none', '--entitlements', entitlementsPath, stagingPath];
+    await execFile('/usr/bin/codesign', appSignArgs, { encoding: 'utf8' });
     await execFile('/usr/bin/codesign', ['--verify', '--deep', '--strict', stagingPath], { encoding: 'utf8' });
     await rm(entitlementsPath, { force: true });
 
-    const previousPath = `${clonePath}.previous-${process.pid}-${Date.now()}`;
-    if (replace && await exists(clonePath)) await rename(clonePath, previousPath);
+    previousPath = `${targetPath}.previous-${process.pid}-${Date.now()}`;
+    if (generationOptions.appMode === 'clone' && replace && await exists(targetPath)) await rename(targetPath, previousPath);
     try {
-      await rename(stagingPath, clonePath);
-      if (replace && await exists(previousPath)) await rm(previousPath, { recursive: true, force: true });
+      if (generationOptions.appMode === 'official') {
+        await rename(appDir, previousPath);
+        await rename(stagingPath, appDir);
+        officialReplaced = true;
+      } else {
+        await rename(stagingPath, targetPath);
+      }
+      if (generationOptions.appMode === 'clone' && replace && await exists(previousPath)) await rm(previousPath, { recursive: true, force: true });
     } catch (error) {
-      if (replace && await exists(previousPath)) await rename(previousPath, clonePath);
+      if (await exists(previousPath) && !await exists(targetPath)) await rename(previousPath, targetPath);
       throw error;
     }
     return {
-      appPath: clonePath,
+      appPath: targetPath,
+      appMode: generationOptions.appMode,
+      translationMode: generationOptions.translationMode,
+      backup,
       translationVersion: upstream.version,
       sourceCommit: upstream.commit,
       manifest,
     };
   } catch (error) {
+    if (generationOptions?.appMode === 'official' && officialReplaced && previousPath && await exists(previousPath)) {
+      await rm(appDir, { recursive: true, force: true });
+      await rename(previousPath, appDir).catch(() => {});
+    }
     await rm(stagingPath, { recursive: true, force: true });
     await rm(entitlementsPath, { force: true });
+    if (generationOptions?.appMode === 'official') {
+      // The original official bundle is retained in the backup directory; callers can restore it explicitly.
+    }
     throw error;
   }
 }
