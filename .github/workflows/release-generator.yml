@@ -41,10 +41,11 @@ jobs:
       - name: Install generator dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
 
-      - name: Run Node and Swift tests
-        run: |
-          npm test
-          swift test --package-path installer-macos
+      - name: Run Node tests
+        run: npm test
+
+      - name: Run Swift tests
+        run: swift test --package-path installer-macos
 
       - name: Pack the clean CLI source archive
         shell: /bin/zsh {0}

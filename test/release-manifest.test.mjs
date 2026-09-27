@@ -18,7 +18,8 @@ test('release workflow verifies pinned Node runtimes and publishes exactly one D
   assert.match(workflow, /node-v\$\{\{ env\.NODE_VERSION \}\}-darwin-arm64\.tar\.gz/);
   assert.match(workflow, /node-v\$\{\{ env\.NODE_VERSION \}\}-darwin-x64\.tar\.gz/);
   assert.match(workflow, /shasum -a 256 -c/);
-  assert.match(workflow, /npm test/);
+  assert.match(workflow, /name: Run Node tests[\s\S]*run: npm test/);
+  assert.match(workflow, /name: Run Swift tests[\s\S]*swift test --package-path installer-macos/);
   assert.match(workflow, /verify:generator-bundle/);
   assert.match(workflow, /build-translation-package\.mjs[\s\S]*claude-zh-translations\.json/);
   assert.match(workflow, /build:generator[\s\S]*--translation-package dist\/release\/claude-zh-translations\.json/);
