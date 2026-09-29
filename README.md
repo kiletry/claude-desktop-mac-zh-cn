@@ -2,7 +2,12 @@
 
 这是一个本地生成器工具：读取你本机的官方 `Claude.app`，自动识别版本，获取匹配的简体中文翻译数据，并生成独立的 `/Applications/Claude 中文.app`。
 
-官方应用始终保持不变：不修改、不重签名、不写入 `/Applications/Claude.app`。
+默认独立副本模式会保持官方应用不变：不修改、不重签名、不写入 `/Applications/Claude.app`。
+
+默认使用独立中文副本模式。生成器也提供“修改官方 Claude”模式，但该模式会先备份再直接
+修改 `/Applications/Claude.app`，并用本机临时签名替换官方签名；完成后官方 Claude 会失去
+Anthropic 签名和 Gatekeeper 信任，之后不能再通过生成器的官方源检查。需要重新生成时，必须
+先恢复备份或从官方 DMG 重新安装。日常使用请保留官方 Claude 不变，只更新独立中文副本。
 
 ## 图形化快速使用（推荐）
 
@@ -75,7 +80,11 @@ open "/Applications/Claude 中文.app"
   --backup-count 1
 ```
 
-`official` 模式会先备份 `/Applications/Claude.app`，再修改官方包并进行本机临时签名，可能影响官方签名、Gatekeeper、Cowork 和自动更新。`safe` 模式写入中文资源和静态 locale/界面补丁，但跳过结构性 `app.asar` 运行时及在线页面注入。备份支持固定覆盖或按 Claude 版本和时间生成版本号备份；只会清理本工具生成的备份。
+`official` 模式会先备份 `/Applications/Claude.app`，再修改官方包并进行本机临时签名。它会
+破坏官方签名和 Gatekeeper 信任，可能影响 Cowork、Claude Code、自动更新及其他官方安装检查；
+下一次运行生成器时，官方源检查会失败。`safe` 模式写入中文资源和静态 locale/界面补丁，但
+跳过结构性 `app.asar` 运行时及在线页面注入。备份支持固定覆盖或按 Claude 版本和时间生成
+版本号备份；只会清理本工具生成的备份。
 
 ## 更新 Claude 后
 
@@ -85,6 +94,11 @@ open "/Applications/Claude 中文.app"
 ```bash
 ./install.sh generate --replace
 ```
+
+如果检查提示官方 Claude 未通过签名或 Gatekeeper 验证，先确认 `/Applications/Claude.app`
+是 Anthropic 原始安装包。已被中文生成器修改过的官方包不能再次作为可信源；请从备份恢复，
+或从官方 DMG 重新安装，然后再生成独立中文副本。翻译数据或新版本资源结构尚未适配时，
+生成器会拒绝生成，不要强行覆盖或手工修改官方应用。
 
 生成副本会记录所用 Claude 版本、翻译版本、翻译提交以及写入路径，位置为：
 

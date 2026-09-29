@@ -1,8 +1,16 @@
 # 图形化安装与更新指南
 
-`Claude 中文生成器.app` 是本项目推荐的使用方式。它只检查本机官方
-`/Applications/Claude.app`，并在你明确确认后生成独立的
-`/Applications/Claude 中文.app`；绝不修改、重签名或替换官方应用。
+`Claude 中文生成器.app` 默认生成独立的 `/Applications/Claude 中文.app`。它会先检查本机
+官方 `/Applications/Claude.app`，只有你明确确认后才写入目标副本。默认模式不修改官方应用。
+
+生成器有两种应用模式：
+
+- **独立中文副本（默认）**：复制官方应用，写入中文资源并使用本机临时签名。官方应用保留
+  原始签名；中文副本使用独立的应用身份和数据目录。
+- **修改官方 Claude**：先备份，再直接修改 `/Applications/Claude.app`。修改后会失去
+  Anthropic 官方签名和 Gatekeeper 信任，之后不能再通过生成器的官方源检查；自动更新、
+  Cowork、Claude Code 和其他官方安装检查也可能失效。需要重新生成时，必须先恢复备份或
+  从官方 DMG 重新安装。
 
 ## 首次安装
 
@@ -11,10 +19,11 @@
 3. 打开生成器。首次使用来源不明的下载文件时，macOS 可能出现 Gatekeeper 提示：在
    Finder 中按住 Control 点按应用，选择“打开”，再确认一次。只应下载本项目 Release
    中的 DMG；不应通过关闭 Gatekeeper 或移除系统安全保护来绕过警告。
-4. 生成器首先显示官方 Claude 的版本、Bundle ID、签名及 Gatekeeper 检查结果。检查
-   未通过时不要继续，重新从 Anthropic 安装官方 Claude Desktop。
-5. 点击“生成/更新中文副本”，并在确认框中确认。已有中文副本时，确认意味着该独立
-   副本会被重新生成；官方 `Claude.app` 不会被覆盖。
+4. 生成器首先显示官方 Claude 的版本、Bundle ID、签名及 Gatekeeper 检查结果。检查未通过
+   时不要继续：如果这个应用曾被中文生成器修改过，请先恢复备份；没有可用备份时，请从
+   Anthropic 或官方 DMG 重新安装 Claude Desktop。
+5. 点击“生成/更新中文副本”，并在确认框中确认。已有中文副本时，确认意味着该独立副本
+   会被重新生成；官方 `Claude.app` 不会被覆盖。
 
 生成成功后，点击“打开 Claude 中文”。中文副本的配置、登录态和缓存位于：
 
@@ -30,12 +39,19 @@
 的版本和签名正确，再点击“生成/更新中文副本”。翻译数据或 Claude 的资源结构尚未适配
 新版本时，生成器会拒绝生成；请等待翻译数据或本工具更新，不要手工修改官方应用。
 
+如果你选择过“修改官方 Claude”，后续检查失败是预期结果，因为官方包已经被重签名。请
+退出 Claude，使用生成器创建的备份恢复 `/Applications/Claude.app`，再重新打开生成器；
+也可以从官方 DMG 重新安装。恢复或重新安装后，优先使用默认的独立中文副本模式。
+
 ## 临时签名、Gatekeeper 与“无效安装”
 
 生成的 `Claude 中文.app` 是本机复制出的独立副本，使用本地临时签名（ad-hoc signing），
 不是 Anthropic 的 Developer ID 签名或公证版本。因此即使生成器已经验证官方应用，中文
 副本在 Gatekeeper、Cowork、Claude Code 或其他官方安装校验中仍可能显示“无效安装”。
 这是签名身份限制，不是翻译失败。
+
+如果检查界面提示“官方 Claude 未通过签名或 Gatekeeper 验证”，不要对当前文件继续生成。
+这通常表示它不是官方原始包，或者曾被修改/重签名；请恢复备份或重新安装官方版本。
 
 需要 Anthropic 官方 Team ID、Cowork、Claude Code、自动更新、虚拟机沙箱或官方签名
 校验的功能时，请改用 `/Applications/Claude.app`。不要移除 macOS 安全机制，也不要对
@@ -80,7 +96,9 @@ AI 专用）或 Cowork，且模式选择器可能不可选；这是 Gateway 配�
 - 翻译模式：完整模式（默认）或安全模式。
 - 备份目录、覆盖/版本号备份策略及保留数量。
 
-官方模式会在写入前创建并保留可恢复备份，但会改变官方应用签名；需要官方签名、Cowork 或自动更新时请谨慎选择。安全模式不修改结构性 `app.asar` 运行时和在线页面 preload。
+官方模式会在写入前创建并保留可恢复备份，但会改变官方应用签名；它不适合日常更新，也会
+导致下次官方源检查失败。要恢复官方状态，请使用备份或官方 DMG。安全模式不修改结构性
+`app.asar` 运行时和在线页面 preload，但只要选择官方模式，官方包仍会被重新签名。
 
 ## 日志、取消与回滚
 
@@ -97,6 +115,14 @@ AI 专用）或 Cowork，且模式选择器可能不可选；这是 Gateway 配�
 同时清除该副本的登录态和配置，再删除
 `~/Library/Application Support/Claude Desktop zh-CN`。这不会影响官方 Claude。以后
 重新运行生成器即可再次创建副本。
+
+如果回滚的是“修改官方 Claude”模式，请不要删除备份目录。先退出 Claude，再将备份中的
+`Claude.app` 恢复到 `/Applications/Claude.app`，确认 `codesign` 和 Gatekeeper 恢复后，
+再使用独立中文副本模式。备份默认位于：
+
+```text
+~/Library/Application Support/ClaudeChineseGenerator/Backups/
+```
 
 ## 命令行备用路径
 
