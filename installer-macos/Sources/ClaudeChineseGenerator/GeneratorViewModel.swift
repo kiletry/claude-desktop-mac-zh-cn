@@ -121,6 +121,20 @@ final class GeneratorViewModel: ObservableObject {
         NSWorkspace.shared.activateFileViewerSelecting([latestLogURL])
     }
 
+    func restoreOfficialBackup() async {
+        do {
+            let result = try await bridge.run(
+                arguments: commandPrefix + ["restore-official", "--backup-dir", configuration.backupDirectoryURL.path],
+                environment: safeEnvironment,
+                onEvent: { _ in }
+            )
+            latestLogURL = result.logURL
+            await check()
+        } catch {
+            state = failureState(from: error)
+        }
+    }
+
     private func generate() async {
         cancellationRequested = false
         let label = configuration.appMode == .official ? "正在修改官方 Claude…" : "正在生成中文副本…"

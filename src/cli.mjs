@@ -2,6 +2,7 @@ import { CompatibilityError, UserError, asExitCode } from './errors.mjs';
 import { inspectClaudeApp } from './claude-inspector.mjs';
 import { buildCompanion, launchCompanion } from './companion.mjs';
 import { buildLocalizedClone } from './localized-clone.mjs';
+import { DEFAULT_BACKUP_DIR, findLatestOfficialBackup, restoreOfficialBackup } from './backup-manager.mjs';
 import { createGeneratorEvent, serializeGeneratorEvent } from './generator-events.mjs';
 import { fileURLToPath } from 'node:url';
 import { spawn as defaultSpawn } from 'node:child_process';
@@ -18,9 +19,10 @@ Commands:
                     --backup-count N, --confirm-official-modification
   build-companion   Build the separate offline companion
   launch-companion  Launch the separate offline companion
-  build-localized-clone  Build an independently signed Chinese Claude copy`;
+  build-localized-clone  Build an independently signed Chinese Claude copy
+  restore-official       Restore /Applications/Claude.app from a managed backup`;
 
-const COMMANDS = new Set(['status', 'generate', 'build-companion', 'launch-companion', 'build-localized-clone']);
+const COMMANDS = new Set(['status', 'generate', 'build-companion', 'launch-companion', 'build-localized-clone', 'restore-official']);
 const RETIRED_COMMANDS = new Set(['install', 'update', 'restore']);
 
 export async function runCli(argv, dependencies = {}) {
@@ -46,6 +48,14 @@ export async function runCli(argv, dependencies = {}) {
   const appDir = options.appDir ?? '/Applications/Claude.app';
   const inspect = dependencies.inspectClaudeApp ?? inspectClaudeApp;
   const output = dependencies.writeJson ?? ((value) => write(JSON.stringify(value, null, 2)));
+  if (command === 'restore-official') {
+    const backupPath = options.backup ?? await findLatestOfficialBackup({ backupDir: options.backupDir ?? DEFAULT_BACKUP_DIR });
+    if (!backupPath) throw new UserError('No managed official backup was found. Pass --backup PATH or reinstall Claude from the official DMG.');
+    const restore = dependencies.restoreOfficialBackup ?? restoreOfficialBackup;
+    const result = await restore({ backupPath, targetPath: appDir });
+    output(result);
+    return 0;
+  }
   let app;
   emit({ event: 'inspection_started', stage: 'inspection', message: 'Inspecting the official Claude app.' });
   try {
@@ -151,6 +161,8 @@ function parseOptions(args) {
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === '--app-dir') options.appDir = args[++index];
+    else if (arg === '--backup') options.backup = args[++index];
+    else if (arg === '--backup-dir') options.backupDir = args[++index];
     else if (arg === '--output-dir') options.outputDir = args[++index];
     else if (arg === '--replace') options.replace = true;
     else if (arg === '--app-mode') options.appMode = args[++index];

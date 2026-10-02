@@ -53,6 +53,24 @@ test('reports official bundle and Gatekeeper assessment', async () => {
   assert.equal(result.gatekeeper.accepted, true);
 });
 
+test('reports ad-hoc signing separately from official Developer ID signing', async () => {
+  const appDir = await makeApp();
+  const result = await inspectClaudeApp(appDir, {
+    execFile: async (file, args) => {
+      if (file === '/usr/bin/plutil') return { stdout: JSON.stringify({
+        CFBundleIdentifier: 'com.anthropic.claudefordesktop',
+        CFBundleShortVersionString: '2.19675.0',
+      }), stderr: '' };
+      if (file === '/usr/bin/codesign' && args[0] === '-dvvv') return {
+        stdout: '', stderr: 'Identifier=com.anthropic.claudefordesktop\nSignature=adhoc\nTeamIdentifier=not set\n',
+      };
+      return { stdout: '', stderr: '' };
+    },
+  });
+  assert.equal(result.signing.teamIdentifier, null);
+  assert.equal(result.signing.officialDeveloperId, false);
+});
+
 test('rejects an explicit invalid app directory', async () => {
   await assert.rejects(
     inspectClaudeApp('/missing/Claude.app', { execFile: async () => ({}) }),

@@ -62,6 +62,47 @@ export async function createBackup({ sourcePath, backupDir, policy = 'versioned'
   return { path: targetPath, manifestPath: `${targetPath}.manifest.json`, policy, count, removed: pruned.removed };
 }
 
+export async function restoreOfficialBackup({ backupPath, targetPath }) {
+  if (!isAbsolute(backupPath) || !isAbsolute(targetPath)) throw new UserError('Restore paths must be absolute.');
+  if (!backupPath.endsWith('.backup') || !targetPath.endsWith('/Claude.app')) throw new UserError('Restore paths must target a Claude.app backup and /Applications/Claude.app.');
+  const manifestPath = `${backupPath}.manifest.json`;
+  let manifest;
+  try { manifest = JSON.parse(await readFile(manifestPath, 'utf8')); } catch (error) { throw new UserError('The selected backup has no readable manifest.', { cause: error }); }
+  if (manifest.marker !== MANAGED_MARKER || manifest.backupPath !== backupPath || manifest.appMode !== 'official') {
+    throw new UserError('The selected backup was not created by the official Claude backup mode.');
+  }
+  const sourceStat = await stat(backupPath).catch(() => null);
+  if (!sourceStat?.isDirectory()) throw new UserError(`Backup app is missing: ${backupPath}`);
+  const parent = dirname(targetPath);
+  const tempPath = join(parent, `.Claude.app.restore-${process.pid}-${Date.now()}`);
+  await cp(backupPath, tempPath, { recursive: true, dereference: false, errorOnExist: true });
+  try {
+    await rm(targetPath, { recursive: true, force: true });
+    await rename(tempPath, targetPath);
+  } catch (error) {
+    await rm(tempPath, { recursive: true, force: true });
+    throw error;
+  }
+  return { backupPath, targetPath };
+}
+
+export async function findLatestOfficialBackup({ backupDir }) {
+  const entries = await readdir(backupDir, { withFileTypes: true }).catch(() => []);
+  const candidates = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.endsWith('.backup')) continue;
+    const path = join(backupDir, entry.name);
+    try {
+      const manifest = JSON.parse(await readFile(`${path}.manifest.json`, 'utf8'));
+      if (manifest.marker === MANAGED_MARKER && manifest.backupPath === path && manifest.appMode === 'official') {
+        candidates.push({ path, createdAt: Date.parse(manifest.createdAt) || 0 });
+      }
+    } catch { /* ignore unrelated backups */ }
+  }
+  candidates.sort((a, b) => b.createdAt - a.createdAt || b.path.localeCompare(a.path));
+  return candidates[0]?.path ?? null;
+}
+
 export async function pruneBackups({ backupDir, count = 1 }) {
   if (!Number.isInteger(count) || count < 1) throw new UserError('--backup-count must be a positive integer.');
   const entries = await readdir(backupDir, { withFileTypes: true }).catch(() => []);

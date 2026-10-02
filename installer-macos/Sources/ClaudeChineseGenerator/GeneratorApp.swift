@@ -75,6 +75,7 @@ private struct GeneratorWindow: View {
                     GridRow { Text("版本"); Text(inspection.version) }
                     GridRow { Text("Bundle ID"); Text(inspection.bundleIdentifier) }
                     GridRow { Text("签名"); Text(inspection.signingVerified ? "已验证" : "未验证") }
+                    GridRow { Text("官方签名"); Text(inspection.officialDeveloperId ? "Anthropic Developer ID" : "不是官方签名") }
                     GridRow { Text("Gatekeeper"); Text(inspection.gatekeeperAccepted ? "已接受" : "未接受") }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -85,6 +86,7 @@ private struct GeneratorWindow: View {
                 Text("请确认这是从 Anthropic 安装的原始 /Applications/Claude.app。已被中文生成器修改或重签名的应用不能再次作为官方源；请恢复备份或重新安装官方 Claude。")
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
+                Button("从默认备份恢复官方 Claude") { Task { await viewModel.restoreOfficialBackup() } }
             default:
                 Text("检查结果会显示在这里。")
             }

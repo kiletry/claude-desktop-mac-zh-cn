@@ -8,6 +8,7 @@ import {
   createBackup,
   normalizeGenerationOptions,
   pruneBackups,
+  restoreOfficialBackup,
 } from '../src/backup-manager.mjs';
 
 async function makeApp(root, name = 'Claude.app') {
@@ -49,6 +50,16 @@ test('creates an overwrite backup atomically and writes a manifest', async () =>
   await assert.rejects(access(join(result.path, 'claude-chinese-backup-manifest.json')));
   assert.equal(manifest.appVersion, '1.2.3');
   assert.equal(manifest.sourcePath, sourcePath);
+});
+
+test('restores only a managed official Claude backup', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'claude-restore-'));
+  const sourcePath = await makeApp(root);
+  const backupDir = join(root, 'backups');
+  const backup = await createBackup({ sourcePath, backupDir, metadata: { appVersion: '2.19675.0', appMode: 'official' } });
+  await writeFile(join(sourcePath, 'Contents/Resources/marker.txt'), 'modified');
+  await restoreOfficialBackup({ backupPath: backup.path, targetPath: sourcePath });
+  assert.equal(await readFile(join(sourcePath, 'Contents/Resources/marker.txt'), 'utf8'), 'official');
 });
 
 test('creates versioned backups and prunes only managed backups', async () => {

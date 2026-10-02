@@ -6,6 +6,7 @@ import { execFile as execFileCallback } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { selectCompatibleTranslationVersion } from '../src/translation-source.mjs';
+import { LOCAL_TRANSLATION_OVERRIDES } from '../src/local-translation-overrides.mjs';
 
 const execFile = promisify(execFileCallback);
 const output = process.argv[process.argv.indexOf('--output') + 1];
@@ -25,7 +26,11 @@ const packageValue = {
   translations: [{
     version: upstream.version,
     commit: upstream.commit,
-    files: { ion, dynamic: upstream.files.dynamic, desktop },
+    files: {
+      ion: applyOverrides(ion, 'ion'),
+      dynamic: applyOverrides(upstream.files.dynamic, 'dynamic'),
+      desktop: applyOverrides(desktop, 'desktop'),
+    },
     english: upstream.english,
   }],
 };
@@ -84,4 +89,9 @@ function mergeJson(baseText, fallbackText) {
   const base = JSON.parse(baseText);
   const fallback = JSON.parse(fallbackText);
   return `${JSON.stringify({ ...fallback, ...base }, null, 2)}\n`;
+}
+
+function applyOverrides(text, name) {
+  const values = JSON.parse(text);
+  return `${JSON.stringify({ ...values, ...(LOCAL_TRANSLATION_OVERRIDES[name] ?? {}) }, null, 2)}\n`;
 }

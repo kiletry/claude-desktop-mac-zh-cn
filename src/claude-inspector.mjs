@@ -42,12 +42,24 @@ export async function inspectClaudeApp(appDir, { execFile = defaultExecFile } = 
   if (bundleId !== OFFICIAL_BUNDLE_ID) {
     throw new CompatibilityError(`Unsupported Claude bundle identifier: ${String(bundleId)}`);
   }
-  let signing = { verified: false, output: '' };
+  let signing = { verified: false, output: '', identity: null, teamIdentifier: null, officialDeveloperId: false };
   try {
     const result = await execFile('/usr/bin/codesign', ['--verify', '--deep', '--strict', appDir]);
-    signing = { verified: true, output: result.stderr ?? '' };
+    signing = { ...signing, verified: true, output: result.stderr ?? '' };
   } catch (error) {
-    signing = { verified: false, output: error.stderr ?? error.message ?? '' };
+    signing = { ...signing, verified: false, output: error.stderr ?? error.message ?? '' };
+  }
+  try {
+    const result = await execFile('/usr/bin/codesign', ['-dvvv', '--', appDir]);
+    const details = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+    const identity = details.match(/^Authority=([^\n]+)$/m)?.[1] ?? null;
+    const teamIdentifier = details.match(/^TeamIdentifier=([^\n]+)$/m)?.[1] ?? null;
+    signing.identity = identity;
+    signing.teamIdentifier = teamIdentifier && teamIdentifier !== 'not set' ? teamIdentifier : null;
+    signing.officialDeveloperId = /Developer ID Application: Anthropic PBC/.test(details)
+      && signing.teamIdentifier === 'Q6L2SF6YDW';
+  } catch {
+    // Signature verification above remains the source of truth for integrity.
   }
   let gatekeeper = { accepted: false, output: '' };
   try {

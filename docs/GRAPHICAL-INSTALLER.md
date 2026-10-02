@@ -43,6 +43,10 @@
 退出 Claude，使用生成器创建的备份恢复 `/Applications/Claude.app`，再重新打开生成器；
 也可以从官方 DMG 重新安装。恢复或重新安装后，优先使用默认的独立中文副本模式。
 
+生成器会在检查中显示“官方签名”。只有 Anthropic PBC 的 Developer ID 签名和 Team ID
+`Q6L2SF6YDW` 才算官方包；显示 `adhoc`、没有 Team ID 或“不是官方签名”时，说明应用曾被
+修改或重签名。检查失败页面提供“从默认备份恢复官方 Claude”；也可以从官方 DMG 重新安装。
+
 ## 临时签名、Gatekeeper 与“无效安装”
 
 生成的 `Claude 中文.app` 是本机复制出的独立副本，使用本地临时签名（ad-hoc signing），
@@ -122,6 +126,13 @@ AI 专用）或 Cowork，且模式选择器可能不可选；这是 Gateway 配�
 
 ```text
 ~/Library/Application Support/ClaudeChineseGenerator/Backups/
+```
+
+也可以使用 CLI 恢复带清单的官方备份：
+
+```bash
+./install.sh restore-official \
+  --backup-dir "$HOME/Library/Application Support/ClaudeChineseGenerator/Backups"
 ```
 
 ## 命令行备用路径

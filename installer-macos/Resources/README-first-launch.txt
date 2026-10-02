@@ -17,6 +17,10 @@ Claude.app。
 /Applications/Claude.app、Bundle ID 不正确、官方签名失效，或者这个 Claude.app 已经被中文
 生成器修改过。恢复官方版本后，再点“重新检查官方 Claude”。
 
+检查中的“官方签名”只有在显示 Anthropic PBC Developer ID 和 Team ID Q6L2SF6YDW 时才算
+官方包。显示 adhoc、没有 Team ID 或“不是官方签名”表示应用曾被修改或重签名；可在检查失败
+页面使用“从默认备份恢复官方 Claude”，也可以从官方 DMG 重新安装。
+
 中文副本使用独立数据目录：
 ~/Library/Application Support/Claude Desktop zh-CN
 

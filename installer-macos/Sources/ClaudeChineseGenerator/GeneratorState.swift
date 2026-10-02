@@ -87,6 +87,8 @@ struct Inspection: Equatable, Sendable {
     let bundleIdentifier: String
     let version: String
     let signingVerified: Bool
+    let officialDeveloperId: Bool
+    let teamIdentifier: String?
     let gatekeeperAccepted: Bool
 
     var isTrustedOfficialApp: Bool {
@@ -101,7 +103,8 @@ struct Inspection: Equatable, Sendable {
               let appDirectory = value["appDir"]?.stringValue,
               let bundleIdentifier = value["bundleId"]?.stringValue,
               let version = value["version"]?.stringValue,
-              let signing = value["signing"]?.objectValue?["verified"]?.boolValue,
+              let signingObject = value["signing"]?.objectValue,
+              let signing = signingObject["verified"]?.boolValue,
               let gatekeeper = value["gatekeeper"]?.objectValue?["accepted"]?.boolValue
         else { return nil }
         return Inspection(
@@ -109,6 +112,8 @@ struct Inspection: Equatable, Sendable {
             bundleIdentifier: bundleIdentifier,
             version: version,
             signingVerified: signing,
+            officialDeveloperId: signingObject["officialDeveloperId"]?.boolValue ?? false,
+            teamIdentifier: signingObject["teamIdentifier"]?.stringValue,
             gatekeeperAccepted: gatekeeper
         )
     }

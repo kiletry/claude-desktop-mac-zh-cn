@@ -1,0 +1,43 @@
+// Small local patch set for Claude versions released before the upstream catalog catches up.
+// Keys are message IDs from the official 2.19675.0 resources.
+export const LOCAL_TRANSLATION_OVERRIDES = Object.freeze({
+  ion: Object.freeze({
+    '+8k7qViPUD': '开始发送邮件',
+    '+8oeasINaa': '使用代码登录',
+    '+EP4ur06R9': '默认分支',
+    '/7/awkVHU7': '搜索',
+    '/QDHLPCSrV': '重新安装 Claude Code',
+    '1y+kpVW12G': 'Claude 无权访问此文件所在的文件夹。在 Mac 上，请前往“系统设置”>“隐私与安全性”>“文件与文件夹”中允许访问。如果仍无法访问，请退出并重新打开 Claude。',
+    '0JZRKp4xP7': '运行位置',
+    '0KKXrHbU/8': '预算',
+    '0VJ03441aq': 'Cowork 虚拟机没有响应。',
+    '0WvGqtCHSK': '已重新启用计划任务。',
+    '0Y/wtpZxXB': '在 Excel 中打开电子表格',
+    '0YcbKF75wc': '已创建 {when}',
+    '1tYHERJ7z7': '浏览器网站访问批准',
+    '1xKfChQf6c': '制品',
+    '14enYdj4l+': '制品不再发布',
+    '14wpR9TeWJ': '审核中的更新',
+    '1NdqJfasJp': '正文',
+    '1TyNRB/3q1': '工单',
+    '1sJ0FTOE0U': '删除环境？',
+  }),
+  dynamic: Object.freeze({
+    'EGP6HJPOg+': '简单任务最高效',
+    'XBURx2a572': '适用于复杂工作和日常任务',
+  }),
+  desktop: Object.freeze({
+    '+n5D2xZZFm': '将在此电脑上开启远程控制。',
+    'E0ebputFjt': '按 {key} 播放',
+    'G7z34vBsCO': '空格',
+    'UC4ufyu6D6': '允许',
+    'Ur9IgNnVXB': '允许',
+    'VmfBJuPPlH': '取消',
+    'YR/orXKSe9': '在 Claude Code 中打开',
+    'cQEzKX5AfQ': 'Claude Code',
+    'jO7VoK4TtU': '新建侧边聊天',
+    'kae00Hq579': '在此电脑上更新 Claude 以使用此模型。',
+    'sVuKeGaV54': '要在手机和 claude.ai 上使用此文件夹吗？',
+    'uc60dif05B': '允许云端会话在此电脑上运行命令而不再询问？',
+  }),
+});

@@ -1,6 +1,7 @@
 import { CompatibilityError } from './errors.mjs';
 import { selectTranslationPackageEntry, validateTranslationPackage } from './translation-package.mjs';
 import { readFile } from 'node:fs/promises';
+import { LOCAL_TRANSLATION_OVERRIDES } from './local-translation-overrides.mjs';
 
 const UPSTREAM_OWNER = 'ICERainbow666';
 const UPSTREAM_REPO = 'claude-desktop-zh-cn';
@@ -21,12 +22,12 @@ export async function downloadCompatibleTranslation(appVersion, fetchImpl = fetc
   const bundledPackage = await tryReadBundledPackage();
   if (bundledPackage) {
     const entry = selectTranslationPackageEntry(appVersion, bundledPackage);
-    if (entry) return { ...entry, packageVersion: bundledPackage.packageVersion ?? null, source: 'bundled-package' };
+    if (entry) return { ...applyLocalOverrides(entry), packageVersion: bundledPackage.packageVersion ?? null, source: 'bundled-package' };
   }
   const releasePackage = await tryDownloadReleasePackage(fetchImpl);
   if (releasePackage) {
     const entry = selectTranslationPackageEntry(appVersion, releasePackage);
-    if (entry) return { ...entry, packageVersion: releasePackage.packageVersion ?? null, source: 'project-release' };
+    if (entry) return { ...applyLocalOverrides(entry), packageVersion: releasePackage.packageVersion ?? null, source: 'project-release' };
   }
   const requestOptions = { githubToken: auth.token ?? process.env.GITHUB_TOKEN };
   const commit = await fetchJson(`https://api.github.com/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}/commits/master`, fetchImpl, requestOptions);
@@ -55,7 +56,16 @@ export async function downloadCompatibleTranslation(appVersion, fetchImpl = fetc
     fetchImpl,
     requestOptions,
   );
-  return { commit: commit.sha, version, files: { ion, dynamic, desktop }, english, source: 'upstream-api' };
+  return { commit: commit.sha, version, files: applyLocalOverrides({ files: { ion, dynamic, desktop } }).files, english, source: 'upstream-api' };
+}
+
+function applyLocalOverrides(entry) {
+  const sourceFiles = entry.files ?? {};
+  const files = Object.fromEntries(Object.entries(sourceFiles).map(([name, text]) => {
+    const values = JSON.parse(text);
+    return [name, `${JSON.stringify({ ...values, ...(LOCAL_TRANSLATION_OVERRIDES[name] ?? {}) }, null, 2)}\n`];
+  }));
+  return { ...entry, files };
 }
 
 async function tryReadBundledPackage() {

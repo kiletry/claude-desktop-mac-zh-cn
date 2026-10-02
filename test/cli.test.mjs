@@ -10,7 +10,7 @@ test('help exposes only the safe public commands', async () => {
   const output = [];
   await runCli(['--help'], { write: (line) => output.push(line) });
   assert.match(output.join('\n'), /status.*build-companion.*launch-companion/s);
-  assert.doesNotMatch(output.join('\n'), /\b(?:install|update|restore)\b/);
+  assert.doesNotMatch(output.join('\n'), /\b(?:install|update)\b/);
 });
 
 test('unknown commands reject with a user error', async () => {
@@ -18,6 +18,18 @@ test('unknown commands reject with a user error', async () => {
     runCli(['unknown'], { write: () => {} }),
     (error) => error instanceof UserError && error.exitCode === 2,
   );
+});
+
+test('restore-official restores a managed backup without requiring the current app to be trusted', async () => {
+  const calls = [];
+  const output = [];
+  await runCli(['restore-official', '--backup', '/backups/Claude.app-2.19675.0.backup', '--app-dir', '/Applications/Claude.app'], {
+    inspectClaudeApp: async () => ({ bundleId: 'com.anthropic.claudefordesktop', version: '2.19675.0', signing: { verified: false }, gatekeeper: { accepted: false } }),
+    restoreOfficialBackup: async (options) => { calls.push(options); return options; },
+    writeJson: (value) => output.push(value),
+  });
+  assert.deepEqual(calls, [{ backupPath: '/backups/Claude.app-2.19675.0.backup', targetPath: '/Applications/Claude.app' }]);
+  assert.deepEqual(output, [{ backupPath: '/backups/Claude.app-2.19675.0.backup', targetPath: '/Applications/Claude.app' }]);
 });
 
 test('install rejects legacy patching before mutation is called', async () => {
