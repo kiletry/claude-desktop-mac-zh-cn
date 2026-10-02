@@ -22,12 +22,12 @@ export async function downloadCompatibleTranslation(appVersion, fetchImpl = fetc
   const bundledPackage = await tryReadBundledPackage();
   if (bundledPackage) {
     const entry = selectTranslationPackageEntry(appVersion, bundledPackage);
-    if (entry) return { ...applyLocalOverrides(entry), packageVersion: bundledPackage.packageVersion ?? null, source: 'bundled-package' };
+    if (entry) return { ...maybeApplyLocalOverrides(entry), packageVersion: bundledPackage.packageVersion ?? null, source: 'bundled-package' };
   }
   const releasePackage = await tryDownloadReleasePackage(fetchImpl);
   if (releasePackage) {
     const entry = selectTranslationPackageEntry(appVersion, releasePackage);
-    if (entry) return { ...applyLocalOverrides(entry), packageVersion: releasePackage.packageVersion ?? null, source: 'project-release' };
+    if (entry) return { ...maybeApplyLocalOverrides(entry), packageVersion: releasePackage.packageVersion ?? null, source: 'project-release' };
   }
   const requestOptions = { githubToken: auth.token ?? process.env.GITHUB_TOKEN };
   const commit = await fetchJson(`https://api.github.com/repos/${UPSTREAM_OWNER}/${UPSTREAM_REPO}/commits/master`, fetchImpl, requestOptions);
@@ -56,7 +56,13 @@ export async function downloadCompatibleTranslation(appVersion, fetchImpl = fetc
     fetchImpl,
     requestOptions,
   );
-  return { commit: commit.sha, version, files: applyLocalOverrides({ files: { ion, dynamic, desktop } }).files, english, source: 'upstream-api' };
+  return { commit: commit.sha, version, files: maybeApplyLocalOverrides({ version, files: { ion, dynamic, desktop } }).files, english, source: 'upstream-api' };
+}
+
+function maybeApplyLocalOverrides(entry) {
+  return compareVersionParts(numericVersion(entry.version), numericVersion('2.19675.0')) >= 0
+    ? applyLocalOverrides(entry)
+    : entry;
 }
 
 function applyLocalOverrides(entry) {
