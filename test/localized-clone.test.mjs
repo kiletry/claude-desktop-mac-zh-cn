@@ -87,9 +87,9 @@ test('maps renderer and dynamic resources while recording an absent optional des
 
   assert.deepEqual(plan.writes, [
     {
-      source: 'ion',
+      source: 'desktop',
       destination: '/clone/Contents/Resources/zh-CN.json',
-      content: '{"home":"首页"}\n',
+      content: '{"menu":"菜单"}\n',
     },
     {
       source: 'ion',
@@ -483,6 +483,7 @@ test('builds a separately signed clone without changing the official source bund
     if (url.includes('/contents/translated-zh-CN/ion-dist/en-US.json')) {
       return response({ encoding: 'base64', content: Buffer.from('{"hello":"Hello"}').toString('base64') });
     }
+    if (url.includes('/desktop-shell/zh-CN.json')) return response({ encoding: 'base64', content: Buffer.from('{"services":"服务"}').toString('base64') });
     if (url.includes('/contents/translated-zh-CN/')) {
       return response({ encoding: 'base64', content: Buffer.from('{"hello":"你好","technicalDetails":"当前真实中文"}').toString('base64') });
     }
@@ -543,13 +544,12 @@ test('builds a separately signed clone without changing the official source bund
   assert.match(await readFile(join(result.appPath, 'Contents', 'Resources', 'ion-dist', 'assets', 'v1', 'shared-2.js'), 'utf8'), /"zh-CN"/);
   assert.equal(await readFile(join(resourcesDir, 'ion-dist', 'assets', 'v1', 'shared-2.js'), 'utf8'), sourceRegistry);
   assert.deepEqual(result.manifest.writes.map(({ source, destination }) => ({ source, destination })), [
-    { source: 'ion', destination: 'Contents/Resources/zh-CN.json' },
+    { source: 'desktop', destination: 'Contents/Resources/zh-CN.json' },
     { source: 'ion', destination: 'Contents/Resources/ion-dist/i18n/zh-CN.json' },
     { source: 'dynamic', destination: 'Contents/Resources/ion-dist/i18n/dynamic/zh-CN.json' },
   ]);
   assert.deepEqual(JSON.parse(await readFile(join(result.appPath, 'Contents', 'Resources', 'zh-CN.json'), 'utf8')), {
-    hello: '你好',
-    technicalDetails: '当前真实中文',
+    services: '服务',
   });
   assert.equal(result.manifest.localeRegistryAsset, 'Contents/Resources/ion-dist/assets/v1/shared-2.js');
   assert.deepEqual(result.manifest.skipped, [{ source: 'desktop', reason: 'destination-directory-missing' }]);

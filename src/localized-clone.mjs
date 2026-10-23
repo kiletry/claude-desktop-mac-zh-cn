@@ -76,7 +76,7 @@ export function buildCloneEntitlements(originalEntitlements) {
 export function buildTranslationResourcePlan({ resourcesDir, sourceFiles, availableDirectories }) {
   const resourceDefinitions = [
     {
-      source: 'ion',
+      source: 'desktop',
       directory: resourcesDir,
       destination: `${resourcesDir}/zh-CN.json`,
     },
