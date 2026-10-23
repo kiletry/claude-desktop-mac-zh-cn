@@ -406,7 +406,8 @@ test('patches native macOS menus and role-generated submenu labels', () => {
 test('patches the modern native menu builder used by Claude 1.32885', () => {
   const source = 'async function tQ(){let e=await BNn();return o.Menu.buildFromTemplate(e)}';
   const result = patchNativeMenuLocale(source);
-  assert.match(result, /Menu\.buildFromTemplate\(e\.map\(i\)\)/);
+  assert.match(result, /Menu\.buildFromTemplate\(\(\(\)=>\{/);
+  assert.match(result, /return e\.map\(i\)/);
   assert.match(result, /About Claude/);
   assert.match(result, /撤销/);
   assert.match(result, /"Command Palette…":`命令面板…`/);
@@ -420,15 +421,16 @@ test('patches the modern native menu builder used by Claude 1.32885', () => {
 test('patches modern native menu builders after Electron namespace rotation', () => {
   const source = 'async function AOr(){let e=await kOr();return a.Menu.buildFromTemplate(e)}';
   const result = patchNativeMenuLocale(source);
-  assert.match(result, /async function AOr\(\)\{let e=await kOr\(\);const t=\{/);
-  assert.match(result, /return a\.Menu\.buildFromTemplate\(e\.map\(i\)\)\}/);
+  assert.match(result, /async function AOr\(\)\{let e=await kOr\(\);return a\.Menu\.buildFromTemplate/);
+  assert.match(result, /return a\.Menu\.buildFromTemplate\(\(\(\)=>\{/);
 });
 
 test('patches the Claude 1.34493 native menu builder after minified symbol rotation', () => {
   const source = 'var gDn=async()=>[await Nrn(),Vyn()];async function FZ(){let e=await gDn();return o.Menu.buildFromTemplate(e)}';
   const result = patchNativeMenuLocale(source);
   assert.match(result, /async function FZ\(\)\{let e=await gDn\(\);/);
-  assert.match(result, /Menu\.buildFromTemplate\(e\.map\(i\)\)/);
+  assert.match(result, /Menu\.buildFromTemplate\(\(\(\)=>\{/);
+  assert.match(result, /return e\.map\(i\)/);
   assert.match(result, /"Show Main Window":`显示主窗口`/);
 });
 
@@ -628,4 +630,26 @@ test('translates the Claude 3.6556 auto-open file settings through the fallback 
   const map = buildWebTranslationMap(Object.fromEntries(messages.map((message, index) => [index, message])), {});
   assert.deepEqual(collectUntranslatedInterfaceMessages(messages, map), []);
   assert.equal(map[messages[0]], '自动打开 Claude 写入的文件');
+});
+
+test('keeps original menu argument and Electron namespace bindings outside injected translation scope', async () => {
+  for (const namespace of ['t', 'r', 'i']) {
+    const source = `async function menu(){let e=await template(t());return ${namespace}.Menu.buildFromTemplate(e)}`;
+    let calls = 0;
+    const flag = () => { calls += 1; return true; };
+    const context = {
+      t: flag,
+      template: async (enabled) => [{ label: enabled ? 'File' : 'Disabled' }],
+    };
+    context[namespace] ??= {};
+    context[namespace].Menu = { buildFromTemplate: (items) => items };
+    const result = await runInNewContext(`${patchNativeMenuLocale(source)};menu()`, context);
+    assert.equal(calls, 1);
+    assert.equal(result[0].label, '文件');
+  }
+});
+
+test('rejects mixed legacy and modern native menu targets', () => {
+  const source = 'async function n$(){let e=await _Sn();return o.Menu.buildFromTemplate(e)}async function current(){let e=await template(flag());return a.Menu.buildFromTemplate(e)}';
+  assert.throws(() => patchNativeMenuLocale(source), /exactly one native menu locale target, found 2/);
 });

@@ -313,27 +313,28 @@ export function patchNativeMenuLocale(source) {
   const target = 'function n$(){let e=await _Sn();return o.Menu.buildFromTemplate(e)}';
   const localMenuTranslations = JSON.stringify(SETTINGS_TRANSLATIONS);
   const count = source.split(target).length - 1;
-  if (count === 0) {
-    const modernMatches = [];
-    const prefixes = /async function ([A-Za-z_$][A-Za-z0-9_$]*)\(\)\{let e=await ([A-Za-z_$][A-Za-z0-9_$]*)\(/g;
-    for (const prefix of source.matchAll(prefixes)) {
-      const open = prefix.index + prefix[0].length - 1;
-      const end = findBalancedEnd(source, open, '(', ')');
-      if (end === -1) continue;
-      const suffix = /^;return ([A-Za-z_$][A-Za-z0-9_$]*)\.Menu\.buildFromTemplate\(e\)\}/.exec(source.slice(end + 1));
-      if (!suffix) continue;
-      const templateCall = `${prefix[2]}${source.slice(open, end + 1)}`;
-      modernMatches.push([source.slice(prefix.index, end + 1 + suffix[0].length), prefix[1], templateCall, suffix[1]]);
-    }
-    if (modernMatches.length !== 1) {
-      throw new CompatibilityError(`Expected exactly one native menu locale target, found ${modernMatches.length}.`);
-    }
-    const [, menuBuilder, templateCall, menuNamespace] = modernMatches[0];
-    const modernPatch = `async function ${menuBuilder}(){let e=await ${templateCall};const t={...${localMenuTranslations},File:\`文件\`,Edit:\`编辑\`,View:\`视图\`,Window:\`窗口\`,Help:\`帮助\`,"About Claude":\`关于 Claude\`,"Settings…":\`设置…\`,"Check for Updates…":\`检查更新…\`,"New Conversation":\`新建对话\`,"Open File…":\`打开文件…\`,"Open Folder…":\`打开文件夹…\`,"Close Session":\`关闭会话\`,"Show Main Window":\`显示主窗口\`,"Copy URL":\`复制网址\`,"Reload This Page":\`重新加载此页\`,Reload:\`重新加载\`,"Actual Size":\`实际大小\`,"Actual Size (numpad)":\`实际大小\`,"Zoom In":\`放大\`,"Zoom In (indie cooler version)":\`放大\`,"Zoom In (numpad)":\`放大\`,"Zoom Out":\`缩小\`,"Zoom Out (numpad)":\`缩小\`,"Enter Full Screen":\`进入全屏\`,"Exit Full Screen":\`退出全屏\`,"Command Palette…":\`命令面板…\`,"Show Sidebar":\`显示侧边栏\`,"Hide Sidebar":\`隐藏侧边栏\`,Sidebar:\`侧边栏\`,"Split View":\`分屏视图\`,"New Session on the Right":\`在右侧新建会话\`,"New Session Below":\`在下方新建会话\`,"Focus Next Split View":\`聚焦下一个分屏\`,"Focus Previous Split View":\`聚焦上一个分屏\`,"Close Split View":\`关闭分屏\`,"Show Terminal":\`显示终端\`,"Hide Terminal":\`隐藏终端\`,Terminal:\`终端\`,"Show Diff":\`显示差异\`,"Hide Diff":\`隐藏差异\`,Diff:\`差异\`,"Show Browser":\`显示浏览器\`,"Hide Browser":\`隐藏浏览器\`,Browser:\`浏览器\`,"Show Preview":\`显示预览\`,"Hide Preview":\`隐藏预览\`,Preview:\`预览\`,"Show Side Chat":\`显示侧边聊天\`,"Hide Side Chat":\`隐藏侧边聊天\`,"Side Chat":\`侧边聊天\`,"Close Pane":\`关闭面板\`,Go:\`前往\`,Back:\`后退\`,Forward:\`前进\`,"Search…":\`搜索…\`,"Previous Chat":\`上一个聊天\`,"Next Chat":\`下一个聊天\`,"Previous Task":\`上一个任务\`,"Next Task":\`下一个任务\`,"Previous Session":\`上一个会话\`,"Next Session":\`下一个会话\`,"Claude Help":\`Claude 帮助\`,"Keyboard Shortcuts":\`键盘快捷键\`,"Get Support":\`获取支持\`,"Show App":\`显示应用\`,"App Features":\`应用功能\`,Developer:\`开发者\`,"Configure Third-Party Inference…":\`配置第三方推理…\`,Prototypes:\`原型\`,Debug:\`调试\`,Cancel:\`取消\`,Reset:\`重置\`,Restart:\`重启\`};const r={undo:\`撤销\`,redo:\`重做\`,cut:\`剪切\`,copy:\`复制\`,paste:\`粘贴\`,pasteAndMatchStyle:\`粘贴并匹配样式\`,delete:\`删除\`,selectAll:\`全选\`,minimize:\`最小化\`,zoom:\`缩放\`,close:\`关闭窗口\`,front:\`全部置于最前\`,services:\`服务\`,hide:\`隐藏 Claude\`,hideOthers:\`隐藏其他\`,unhide:\`显示全部\`};const i=e=>{if(!e||typeof e!==\`object\`)return e;const n={...e};if(Array.isArray(e.submenu))n.submenu=e.submenu.map(i);if(typeof e.label===\`string\`){const a=t[e.label]??(/^About (.+)$/.test(e.label)?\`关于 \${e.label.slice(6)}\`:undefined)??(/^Quit (.+)$/.test(e.label)?\`退出 \${e.label.slice(5)}\`:undefined);n.label=a??e.label}else if(typeof e.role===\`string\`&&r[e.role])n.label=r[e.role];return n};return o.Menu.buildFromTemplate(e.map(i))}`;
-    return source.replace(modernMatches[0][0], modernPatch.replace("return o.Menu.buildFromTemplate", `return ${menuNamespace}.Menu.buildFromTemplate`));
+  const modernMatches = [];
+  const prefixes = /async function ([A-Za-z_$][A-Za-z0-9_$]*)\(\)\{let e=await ([A-Za-z_$][A-Za-z0-9_$]*)\(/g;
+  for (const prefix of source.matchAll(prefixes)) {
+    const open = prefix.index + prefix[0].length - 1;
+    const end = findBalancedEnd(source, open, '(', ')');
+    if (end === -1) continue;
+    const suffix = /^;return ([A-Za-z_$][A-Za-z0-9_$]*)\.Menu\.buildFromTemplate\(e\)\}/.exec(source.slice(end + 1));
+    if (!suffix) continue;
+    const original = source.slice(prefix.index, end + 1 + suffix[0].length);
+    // The async spelling of the legacy builder also matches this scanner.
+    if (original.includes(target)) continue;
+    const templateCall = `${prefix[2]}${source.slice(open, end + 1)}`;
+    modernMatches.push([original, prefix[1], templateCall, suffix[1]]);
   }
-  if (count !== 1) {
-    throw new CompatibilityError(`Expected exactly one native menu locale target, found ${count}.`);
+  const total = count + modernMatches.length;
+  if (total !== 1) {
+    throw new CompatibilityError(`Expected exactly one native menu locale target, found ${total}.`);
+  }
+  if (count === 0) {
+    const [, menuBuilder, templateCall, menuNamespace] = modernMatches[0];
+    const modernPatch = `async function ${menuBuilder}(){let e=await ${templateCall};return ${menuNamespace}.Menu.buildFromTemplate((()=>{const t={...${localMenuTranslations},File:\`文件\`,Edit:\`编辑\`,View:\`视图\`,Window:\`窗口\`,Help:\`帮助\`,"About Claude":\`关于 Claude\`,"Settings…":\`设置…\`,"Check for Updates…":\`检查更新…\`,"New Conversation":\`新建对话\`,"Open File…":\`打开文件…\`,"Open Folder…":\`打开文件夹…\`,"Close Session":\`关闭会话\`,"Show Main Window":\`显示主窗口\`,"Copy URL":\`复制网址\`,"Reload This Page":\`重新加载此页\`,Reload:\`重新加载\`,"Actual Size":\`实际大小\`,"Actual Size (numpad)":\`实际大小\`,"Zoom In":\`放大\`,"Zoom In (indie cooler version)":\`放大\`,"Zoom In (numpad)":\`放大\`,"Zoom Out":\`缩小\`,"Zoom Out (numpad)":\`缩小\`,"Enter Full Screen":\`进入全屏\`,"Exit Full Screen":\`退出全屏\`,"Command Palette…":\`命令面板…\`,"Show Sidebar":\`显示侧边栏\`,"Hide Sidebar":\`隐藏侧边栏\`,Sidebar:\`侧边栏\`,"Split View":\`分屏视图\`,"New Session on the Right":\`在右侧新建会话\`,"New Session Below":\`在下方新建会话\`,"Focus Next Split View":\`聚焦下一个分屏\`,"Focus Previous Split View":\`聚焦上一个分屏\`,"Close Split View":\`关闭分屏\`,"Show Terminal":\`显示终端\`,"Hide Terminal":\`隐藏终端\`,Terminal:\`终端\`,"Show Diff":\`显示差异\`,"Hide Diff":\`隐藏差异\`,Diff:\`差异\`,"Show Browser":\`显示浏览器\`,"Hide Browser":\`隐藏浏览器\`,Browser:\`浏览器\`,"Show Preview":\`显示预览\`,"Hide Preview":\`隐藏预览\`,Preview:\`预览\`,"Show Side Chat":\`显示侧边聊天\`,"Hide Side Chat":\`隐藏侧边聊天\`,"Side Chat":\`侧边聊天\`,"Close Pane":\`关闭面板\`,Go:\`前往\`,Back:\`后退\`,Forward:\`前进\`,"Search…":\`搜索…\`,"Previous Chat":\`上一个聊天\`,"Next Chat":\`下一个聊天\`,"Previous Task":\`上一个任务\`,"Next Task":\`下一个任务\`,"Previous Session":\`上一个会话\`,"Next Session":\`下一个会话\`,"Claude Help":\`Claude 帮助\`,"Keyboard Shortcuts":\`键盘快捷键\`,"Get Support":\`获取支持\`,"Show App":\`显示应用\`,"App Features":\`应用功能\`,Developer:\`开发者\`,"Configure Third-Party Inference…":\`配置第三方推理…\`,Prototypes:\`原型\`,Debug:\`调试\`,Cancel:\`取消\`,Reset:\`重置\`,Restart:\`重启\`};const r={undo:\`撤销\`,redo:\`重做\`,cut:\`剪切\`,copy:\`复制\`,paste:\`粘贴\`,pasteAndMatchStyle:\`粘贴并匹配样式\`,delete:\`删除\`,selectAll:\`全选\`,minimize:\`最小化\`,zoom:\`缩放\`,close:\`关闭窗口\`,front:\`全部置于最前\`,services:\`服务\`,hide:\`隐藏 Claude\`,hideOthers:\`隐藏其他\`,unhide:\`显示全部\`};const i=e=>{if(!e||typeof e!==\`object\`)return e;const n={...e};if(Array.isArray(e.submenu))n.submenu=e.submenu.map(i);if(typeof e.label===\`string\`){const a=t[e.label]??(/^About (.+)$/.test(e.label)?\`关于 \${e.label.slice(6)}\`:undefined)??(/^Quit (.+)$/.test(e.label)?\`退出 \${e.label.slice(5)}\`:undefined);n.label=a??e.label}else if(typeof e.role===\`string\`&&r[e.role])n.label=r[e.role];return n};return e.map(i)})())}`;
+    return source.replace(modernMatches[0][0], () => modernPatch);
   }
   const nativeMenuPatch = [
     'function n$(){let e=await _Sn();',
