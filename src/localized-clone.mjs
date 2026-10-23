@@ -7,6 +7,7 @@ import { createPackage, extractAll } from '@electron/asar';
 import { downloadCompatibleTranslation } from './translation-source.mjs';
 import { INTERFACE_PASSTHROUGHS, SETTINGS_TRANSLATIONS } from './settings-translations.mjs';
 import { createBackup, normalizeGenerationOptions } from './backup-manager.mjs';
+import { localTranslationsByText, supplementLocalCatalog } from './local-catalogs.mjs';
 
 const SUPPORTED_LOCALE_ARRAY = '["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"]';
 const CLONE_BUNDLE_IDENTIFIER = 'com.kiletry.claude-desktop-zh-cn';
@@ -381,6 +382,10 @@ export function buildWebTranslationMap(english, chinese, legacyEnglish = {}) {
     const legacy = legacyTranslations[from];
     if (typeof legacy === 'string' && legacy !== from) map[from] = legacy;
   }
+  const local = localTranslationsByText('ion');
+  for (const from of Object.values(english)) {
+    if (map[from] === undefined && Object.hasOwn(local, from)) map[from] = local[from];
+  }
   for (const [from, to] of Object.entries(SETTINGS_TRANSLATIONS)) {
     if (map[from] === undefined && typeof to === 'string' && to !== from) map[from] = to;
   }
@@ -565,7 +570,14 @@ export async function buildLocalizedClone({
       sourceFiles: upstream.files,
       availableDirectories,
     });
-    await Promise.all(resourcePlan.writes.map(({ destination, content }) => writeFile(destination, content)));
+    await Promise.all(resourcePlan.writes.map(async ({ source, destination, content }) => {
+      const englishPath = join(dirname(destination), 'en-US.json');
+      if (source !== 'ion' && await exists(englishPath)) {
+        const english = JSON.parse(await readFile(englishPath, 'utf8'));
+        content = `${JSON.stringify(supplementLocalCatalog(source, english, JSON.parse(content)), null, 2)}\n`;
+      }
+      await writeFile(destination, content);
+    }));
     const englishCatalog = JSON.parse(await readFile(join(resourcesDir, 'ion-dist', 'i18n', 'en-US.json'), 'utf8'));
     const chineseCatalogPath = join(resourcesDir, 'ion-dist', 'i18n', 'zh-CN.json');
     const chineseCatalog = JSON.parse(await readFile(chineseCatalogPath, 'utf8'));

@@ -18,5 +18,8 @@
     "test": "node --test",
     "verify:generator-bundle": "scripts/verify-generator-bundle.sh",
     "package": "npm pack --dry-run"
+  },
+  "devDependencies": {
+    "@formatjs/icu-messageformat-parser": "3.5.22"
   }
 }

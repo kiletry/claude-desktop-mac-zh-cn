@@ -15,7 +15,8 @@ Anthropic 签名和 Gatekeeper 信任，之后不能再通过生成器的官方�
 - 修正资源根目录的桌面壳层词库映射，恢复原生菜单和桌面提示的对应翻译。
 - 补充“自动打开 Claude 写入的文件”及浏览器、预览面板相关说明的中文翻译。
 - 保留旧版资源匹配与目标唯一性检查；完整翻译和安全翻译均使用更新后的设置资源识别规则。
-- 上游完整词库仍基于 `2.19675.0.0`，Claude 3.x 新增内容可能保留英文。
+- 新增项目自带补充词库，覆盖上游未覆盖的前端 5,666 条、桌面端 285 条；保留英文原文，以便消息 ID 变化后继续按原文匹配。
+- Claude `3.6556.2` 的前端、动态和桌面端共 38,122 条消息均有可用值；458 条产品名、技术标识和格式模板保留原样。全部本地条目通过 ICU 参数、分支与富文本标签校验。
 
 ## 图形化快速使用（推荐）
 
@@ -184,8 +185,8 @@ Claude 进入 3P（第三方 / AI 专用）模式。
 - 中文副本不能保证 Cowork、Claude Code、虚拟机沙箱、自动更新或需要 Anthropic 官方 Team ID 的功能可用。需要这些功能时请使用官方 Claude.app。
 - 官方应用和中文副本的登录态、Cookie、Keychain 凭据、缓存、会话及配置互不共享。副本可能需要单独登录；本工具不会复制官方 Keychain 或 OAuth 密钥。
 - Claude 更新后必须重新运行 `./install.sh generate --replace`。新版本可能改变 Electron 资源布局或压缩后的运行时代码，导致翻译补丁拒绝构建；此时应等待翻译数据或补丁适配，不要强行覆盖官方应用。
-- 翻译数据会随本项目 GitHub Release 发布为 `claude-zh-translations.json`，生成器优先下载该包，普通用户不需要申请 GitHub Token；仅当 Release 包不可用时才回退到上游 GitHub API。翻译包以 [ICERainbow666/claude-desktop-zh-cn](https://github.com/ICERainbow666/claude-desktop-zh-cn) 为基础，并补充合并 [javaht/claude-desktop-zh-cn](https://github.com/javaht/claude-desktop-zh-cn) 的简体中文前端和桌面壳层词条，再按已安装 Claude 版本选择最近兼容版本；低于当前版本的翻译可能仍有少量英文或菜单缺失。
-- 当上游翻译尚未覆盖 Claude 的新设置项时，生成器会对常见的设置标题、网络、用量、扩展和运行时选项应用本地补充翻译；新增加的专有名词或动态内容仍可能保留英文。
+- 翻译数据会随本项目 GitHub Release 发布为 `claude-zh-translations.json`，生成器优先下载该包，普通用户不需要申请 GitHub Token；仅当 Release 包不可用时才回退到上游 GitHub API。翻译包以 [ICERainbow666/claude-desktop-zh-cn](https://github.com/ICERainbow666/claude-desktop-zh-cn) 为基础，并补充合并 [javaht/claude-desktop-zh-cn](https://github.com/javaht/claude-desktop-zh-cn) 的简体中文前端和桌面壳层词条，再合入项目维护的本地词库，并按已安装 Claude 版本选择最近兼容版本。
+- 当上游翻译尚未覆盖当前 Claude 文案时，由本项目翻译并补充到 `src/translations/`；词库随 CLI、图形生成器和 Release 翻译包一起发布。后续 Claude 新增文案、服务端动态内容及专有名词仍可能保留英文。
 - 如果 Claude 只更换了 message key、英文原文没有变化，生成器会使用上游英文基准目录按原文复用已有中文翻译；因此设置项标题和描述不再受 key 变化影响。
 - Gateway 供应商必须提供 Claude Desktop 可用的 Anthropic 兼容接口和可识别的模型目录。供应商返回的模型名称、认证方式、网络可达性或请求格式不兼容时，中文副本可能无法发送消息。
 - API Key 会写入本机应用配置及备份文件。不要把 `~/Library/Application Support/Claude Desktop zh-CN/`、Cockpit/CC Switch 数据目录或日志提交到 GitHub；发现泄露时应立即撤销并重新生成 Key。

@@ -458,6 +458,9 @@ test('builds a separately signed clone without changing the official source bund
     archiveProjects: 'Archive {count, plural, one {project} other {# projects}}?',
     archiveDetails: 'Threads in this project will be archived and become read-only. You can unarchive the project at any time via the <link>projects page</link>.',
   }));
+  await writeFile(join(resourcesDir, 'en-US.json'), JSON.stringify({
+    remote: 'Let your phone and claude.ai start sessions on this computer?',
+  }));
   await writeFile(join(resourcesDir, 'ion-dist', 'assets', 'v1', 'shared-2.js'), registry);
   await writeFile(
     join(resourcesDir, 'ion-dist', 'assets', 'v1', 'c71860c77-Fj5_GsGa.js'),
@@ -552,6 +555,7 @@ test('builds a separately signed clone without changing the official source bund
   ]);
   assert.deepEqual(JSON.parse(await readFile(join(result.appPath, 'Contents', 'Resources', 'zh-CN.json'), 'utf8')), {
     services: '服务',
+    remote: '允许手机和 claude.ai 在此电脑上启动会话？',
   });
   assert.equal(result.manifest.localeRegistryAsset, 'Contents/Resources/ion-dist/assets/v1/shared-2.js');
   assert.deepEqual(result.manifest.skipped, [{ source: 'desktop', reason: 'destination-directory-missing' }]);

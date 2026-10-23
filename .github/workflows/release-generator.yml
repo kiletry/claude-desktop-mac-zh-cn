@@ -130,6 +130,8 @@ jobs:
           cat > "$notes" <<'EOF'
           ## Claude 中文生成器
 
+          - 适配 Claude Desktop 3.6556.2；项目自带词库补充前端 5,666 条、桌面端 285 条，保留技术名称和格式模板。
+          - 本地译文已校验 ICU 参数、选择器与富文本标签；生成器、CLI 和公共翻译包均包含这些补充。
           - 下载并拖入“应用程序”后，先打开生成器检查官方 Claude，再明确确认生成或更新独立中文副本。
           - 中文副本使用本地临时签名（ad-hoc signing），不是 Anthropic 官方签名或公证应用；Gatekeeper、Cowork 或 Claude Code 可能显示“无效安装”。
           - Gateway/API Key 配置可能进入 3P（第三方）/ Cowork 模式并禁用模式选择；需要官方 Team ID、Cowork 或 Claude Code 功能时请使用官方 Claude.app。

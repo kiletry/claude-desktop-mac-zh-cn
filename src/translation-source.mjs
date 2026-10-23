@@ -2,6 +2,7 @@ import { CompatibilityError } from './errors.mjs';
 import { selectTranslationPackageEntry, validateTranslationPackage } from './translation-package.mjs';
 import { readFile } from 'node:fs/promises';
 import { LOCAL_TRANSLATION_OVERRIDES } from './local-translation-overrides.mjs';
+import { supplementTranslationEntry } from './local-catalogs.mjs';
 
 const UPSTREAM_OWNER = 'ICERainbow666';
 const UPSTREAM_REPO = 'claude-desktop-zh-cn';
@@ -71,7 +72,7 @@ function applyLocalOverrides(entry) {
     const values = JSON.parse(text);
     return [name, `${JSON.stringify({ ...values, ...(LOCAL_TRANSLATION_OVERRIDES[name] ?? {}) }, null, 2)}\n`];
   }));
-  return { ...entry, files };
+  return supplementTranslationEntry({ ...entry, files });
 }
 
 async function tryReadBundledPackage() {
