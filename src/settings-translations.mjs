@@ -19,6 +19,9 @@ export const INTERFACE_PASSTHROUGHS = Object.freeze([
 export const SETTINGS_TRANSLATIONS = Object.freeze({
   General: '通用',
   Appearance: '外观',
+  'Auto-open files Claude writes': '自动打开 Claude 写入的文件',
+  'HTML, images, PDFs, and videos Claude writes open in the built-in browser.': 'Claude 写入的 HTML、图片、PDF 和视频会在内置浏览器中打开。',
+  'HTML, images, PDFs, and videos Claude writes open in the Preview pane.': 'Claude 写入的 HTML、图片、PDF 和视频会在预览面板中打开。',
   Language: '语言',
   Notifications: '通知',
   Privacy: '隐私',

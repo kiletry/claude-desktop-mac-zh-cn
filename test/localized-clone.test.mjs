@@ -3,6 +3,7 @@ import { cp, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { runInNewContext } from 'node:vm';
 
 import {
   buildLocalizedClone,
@@ -462,7 +463,7 @@ test('builds a separately signed clone without changing the official source bund
   );
   await writeFile(
     join(resourcesDir, 'ion-dist', 'assets', 'v1', 'c71860c77-CpuCnKDC.js'),
-    'const settings=[{id:"appearance",title:1},{id:"general",title:2}];t({defaultMessage: "apple setting"});t({defaultMessage: "Äther setting"});',
+    'const settings=[{id:"appearance",className:styles,title:1},{id:"general",title:2}];t({defaultMessage: "apple setting"});t({defaultMessage: "Äther setting"});',
   );
   await writeFile(
     join(resourcesDir, 'ion-dist', 'assets', 'v1', 'c42d32d95-DHTanC_8.js'),
@@ -569,4 +570,62 @@ test('builds a separately signed clone without changing the official source bund
     }),
     /Required static settings anchor group was not found: extension settings/,
   );
+});
+
+
+test('preserves nested menu template arguments while translating Claude 3.6556 menus', async () => {
+  const source = 'async function kTi(){let e=await DTi(OTi());return a.Menu.buildFromTemplate(e)}';
+  const flags = [];
+  let flagCalls = 0;
+  const result = await runInNewContext(`${patchNativeMenuLocale(source)};kTi()`, {
+    OTi: () => { flagCalls += 1; return true; },
+    DTi: async (enabled) => {
+      flags.push(enabled);
+      return [{ label: 'File', submenu: [{ role: 'undo' }, { label: 'Unknown plugin' }] }];
+    },
+    a: { Menu: { buildFromTemplate: (items) => items } },
+  });
+  assert.deepEqual(flags, [true]);
+  assert.equal(flagCalls, 1);
+  assert.equal(result[0].label, '文件');
+  assert.equal(result[0].submenu[0].label, '撤销');
+  assert.equal(result[0].submenu[1].label, 'Unknown plugin');
+});
+
+test('rejects ambiguous native menu builders', () => {
+  const source = 'async function first(){let e=await template(flag());return a.Menu.buildFromTemplate(e)}async function second(){let e=await other(flag());return a.Menu.buildFromTemplate(e)}';
+  assert.throws(() => patchNativeMenuLocale(source), /exactly one native menu locale target, found 2/);
+});
+
+test('seeds locale after Electron preload bindings rotate in Claude 3.6556', () => {
+  const source = 'var e=()=>{};let t=require("electron"),n=require("electron/renderer");globalThis.loaded=n;';
+  const stored = new Map();
+  const required = [];
+  const renderer = {};
+  const context = {
+    require: (name) => { required.push(name); return name.endsWith('/renderer') ? renderer : {}; },
+    window: { localStorage: { setItem: (key, value) => stored.set(key, value) }, addEventListener() {} },
+    document: { readyState: 'loading', addEventListener() {} },
+  };
+  runInNewContext(patchMainViewPreloadLocale(source), context);
+  assert.deepEqual(required, ['electron', 'electron/renderer']);
+  assert.equal(context.loaded, renderer);
+  assert.equal(stored.get('locale'), 'zh-CN');
+  assert.equal(stored.get('spa:i18nEarlyCatalog'), 'zh-CN');
+});
+
+test('rejects duplicate renamed Electron preload bindings', () => {
+  const target = 'let t=require("electron"),n=require("electron/renderer");';
+  assert.throws(() => patchMainViewPreloadLocale(`${target}{${target}}`), /exactly one main view preload locale target, found 2/);
+});
+
+test('translates the Claude 3.6556 auto-open file settings through the fallback map', () => {
+  const messages = [
+    'Auto-open files Claude writes',
+    'HTML, images, PDFs, and videos Claude writes open in the built-in browser.',
+    'HTML, images, PDFs, and videos Claude writes open in the Preview pane.',
+  ];
+  const map = buildWebTranslationMap(Object.fromEntries(messages.map((message, index) => [index, message])), {});
+  assert.deepEqual(collectUntranslatedInterfaceMessages(messages, map), []);
+  assert.equal(map[messages[0]], '自动打开 Claude 写入的文件');
 });
