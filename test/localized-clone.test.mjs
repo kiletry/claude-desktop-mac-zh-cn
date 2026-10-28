@@ -41,7 +41,7 @@ const payloads = {
 test('launches the clone with an isolated Electron user-data directory', () => {
   assert.equal(
     buildCloneLauncherScript(),
-    '#!/bin/sh\nset -eu\nSCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\nUSER_DATA_DIR="${CLAUDE_DESKTOP_ZH_CN_USER_DATA_DIR:-$HOME/Library/Application Support/Claude Desktop zh-CN}"\nmkdir -p "$USER_DATA_DIR"\nCONFIG_PATH="$USER_DATA_DIR/config.json"\nif [ -f "$CONFIG_PATH" ]; then\n  /usr/bin/plutil -replace locale -string zh-CN -- "$CONFIG_PATH"\nelse\n  printf \'{\\n\\t"locale": "zh-CN"\\n}\\n\' > "$CONFIG_PATH"\nfi\nexport CLAUDE_USER_DATA_DIR="$USER_DATA_DIR"\nexec "$SCRIPT_DIR/Claude-bin" --user-data-dir "$USER_DATA_DIR" "$@"\n',
+    '#!/bin/sh\nset -eu\nSCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\nUSER_DATA_DIR="${CLAUDE_DESKTOP_ZH_CN_USER_DATA_DIR:-$HOME/Library/Application Support/Claude Desktop zh-CN}"\nmkdir -p "$USER_DATA_DIR"\nCONFIG_PATH="$USER_DATA_DIR/config.json"\nif [ -f "$CONFIG_PATH" ]; then\n  /usr/bin/plutil -replace locale -string zh-CN -- "$CONFIG_PATH"\nelse\n  printf \'{\\n\\t"locale": "zh-CN"\\n}\\n\' > "$CONFIG_PATH"\nfi\nexport CLAUDE_USER_DATA_DIR="$USER_DATA_DIR"\nexec "$SCRIPT_DIR/Claude-bin" --user-data-dir="$USER_DATA_DIR" "$@"\n',
   );
 });
 
@@ -656,4 +656,21 @@ test('keeps original menu argument and Electron namespace bindings outside injec
 test('rejects mixed legacy and modern native menu targets', () => {
   const source = 'async function n$(){let e=await _Sn();return o.Menu.buildFromTemplate(e)}async function current(){let e=await template(flag());return a.Menu.buildFromTemplate(e)}';
   assert.throws(() => patchNativeMenuLocale(source), /exactly one native menu locale target, found 2/);
+});
+
+test('launcher keeps the profile switch in one argument so Claude never opens its own storage as a project', async () => {
+  const { chmod } = await import('node:fs/promises');
+  const { execFileSync } = await import('node:child_process');
+  const root = await mkdtemp(join(tmpdir(), 'claude-launcher-args-'));
+  const profile = join(root, 'Private Profile');
+  const launcher = join(root, 'Claude');
+  const argsPath = join(root, 'args.txt');
+  await writeFile(launcher, buildCloneLauncherScript());
+  await writeFile(join(root, 'Claude-bin'), '#!/bin/sh\nprintf "%s\\n" "$@" > "$ARGUMENT_SNAPSHOT"\n');
+  await chmod(launcher, 0o755);
+  await chmod(join(root, 'Claude-bin'), 0o755);
+  execFileSync(launcher, ['--startup'], { env: { ...process.env, CLAUDE_DESKTOP_ZH_CN_USER_DATA_DIR: profile, ARGUMENT_SNAPSHOT: argsPath } });
+  const args = (await readFile(argsPath, 'utf8')).trim().split('\n');
+  assert.deepEqual(args, [`--user-data-dir=${profile}`, '--startup']);
+  assert.equal(args.includes(profile), false);
 });

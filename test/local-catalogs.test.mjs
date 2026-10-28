@@ -26,3 +26,10 @@ test('web preload fallback uses project local translations for current and rotat
   // The desktop catalog must stay separate from the frontend fallback.
   assert.equal(map['Let your phone and claude.ai start sessions on this computer?'], undefined);
 });
+
+test('uses Claude 4.29 supplements in both frontend fallback and packaged desktop catalogs', () => {
+  assert.equal(buildWebTranslationMap({ rotated: 'Stop sharing with {org}' }, {})['Stop sharing with {org}'], '停止与 {org} 共享');
+  const entry = supplementTranslationEntry({ files: { ion: '{}', dynamic: '{}', desktop: '{}' }, english: '{}' });
+  assert.equal(JSON.parse(entry.files.ion)['++XvhBJqfj'], '停止与 {org} 共享');
+  assert.ok(JSON.parse(entry.files.desktop)['++/vyEBwJg']);
+});

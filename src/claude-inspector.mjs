@@ -1,5 +1,6 @@
 import { access, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { statFile } from '@electron/asar';
 
 import { CompatibilityError } from './errors.mjs';
 
@@ -26,7 +27,11 @@ export async function inspectClaudeApp(appDir, { execFile = defaultExecFile } = 
   const resourcesDir = join(contentsDir, 'Resources');
   const i18nDir = join(resourcesDir, 'ion-dist', 'i18n');
   const assetsDir = join(resourcesDir, 'ion-dist', 'assets', 'v1');
-  if (!await exists(join(contentsDir, 'Info.plist')) || !await exists(resourcesDir) || !await exists(i18nDir)) {
+  const frontendArchive = join(resourcesDir, 'ion-dist.asar');
+  const archivedFrontend = await exists(frontendArchive) && (() => {
+    try { return !statFile(frontendArchive, 'i18n/en-US.json').files && Boolean(statFile(frontendArchive, 'assets/v1').files); } catch { return false; }
+  })();
+  if (!await exists(join(contentsDir, 'Info.plist')) || !await exists(resourcesDir) || (!await exists(i18nDir) && !archivedFrontend)) {
     throw new CompatibilityError(`Unsupported Claude app layout: ${appDir}`);
   }
   let info;
@@ -76,7 +81,8 @@ export async function inspectClaudeApp(appDir, { execFile = defaultExecFile } = 
     resourcesDir,
     version,
     layout: {
-      i18nDir,
+      i18nDir: archivedFrontend ? join(frontendArchive, 'i18n') : i18nDir,
+      frontendArchive: archivedFrontend ? frontendArchive : null,
       assetsDir: await exists(assetsDir) ? assetsDir : null,
       dynamicDir: await exists(dynamicDir) ? dynamicDir : null,
       desktopShellDir: await exists(desktopShellDir) ? desktopShellDir : null,

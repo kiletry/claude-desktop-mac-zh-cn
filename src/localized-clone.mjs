@@ -2,7 +2,9 @@ import { CompatibilityError, UserError } from './errors.mjs';
 import { createHash } from 'node:crypto';
 import { access, chmod, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { createPackage, extractAll } from '@electron/asar';
+import { extractAll } from '@electron/asar';
+import { repackArchive, updateIntegrityDigest } from './asar-resources.mjs';
+import { patchNativeDialogMessages } from './native-dialogs.mjs';
 
 import { downloadCompatibleTranslation } from './translation-source.mjs';
 import { INTERFACE_PASSTHROUGHS, SETTINGS_TRANSLATIONS } from './settings-translations.mjs';
@@ -14,7 +16,11 @@ const CLONE_BUNDLE_IDENTIFIER = 'com.kiletry.claude-desktop-zh-cn';
 const STATIC_SETTINGS_ASSET_ANCHOR_GROUPS = Object.freeze([
   Object.freeze({
     name: 'general settings',
-    anchors: Object.freeze([/\bid:"appearance",[^{};]{0,200}\btitle:/, /\bid:"general",[^{};]{0,200}\btitle:/]),
+    anchors: Object.freeze([/\bid:"general",[^{};]{0,200}\btitle:/]),
+  }),
+  Object.freeze({
+    name: 'appearance settings',
+    anchors: Object.freeze([/\bid:"appearance",[^{};]{0,200}\btitle:/]),
   }),
   Object.freeze({
     name: 'extension settings',
@@ -66,7 +72,7 @@ export function buildCloneLauncherScript() {
     + '  printf \'{\\n\\t"locale": "zh-CN"\\n}\\n\' > "$CONFIG_PATH"\n'
     + 'fi\n'
     + 'export CLAUDE_USER_DATA_DIR="$USER_DATA_DIR"\n'
-    + 'exec "$SCRIPT_DIR/Claude-bin" --user-data-dir "$USER_DATA_DIR" "$@"\n';
+    + 'exec "$SCRIPT_DIR/Claude-bin" --user-data-dir="$USER_DATA_DIR" "$@"\n';
 }
 
 export function buildCloneEntitlements(originalEntitlements) {
@@ -548,6 +554,12 @@ export async function buildLocalizedClone({
       })
       : null;
     const resourcesDir = join(stagingPath, 'Contents', 'Resources');
+    const frontendArchive = join(resourcesDir, 'ion-dist.asar');
+    const archivedFrontend = await exists(frontendArchive);
+    if (archivedFrontend) {
+      if (await exists(join(resourcesDir, 'ion-dist'))) throw new CompatibilityError('Ambiguous frontend layout: both ion-dist and ion-dist.asar exist.');
+      extractAll(frontendArchive, join(resourcesDir, 'ion-dist'));
+    }
     const executableDir = join(stagingPath, 'Contents', 'MacOS');
     const executablePath = join(executableDir, 'Claude');
     const nativeExecutablePath = join(executableDir, 'Claude-bin');
@@ -609,6 +621,12 @@ export async function buildLocalizedClone({
     }
 
     const infoPlist = join(stagingPath, 'Contents', 'Info.plist');
+    if (archivedFrontend) {
+      await repackArchive(join(resourcesDir, 'ion-dist'), frontendArchive);
+      const hash = computeAsarHeaderIntegrity(await readFile(frontendArchive));
+      await execFile('/usr/libexec/PlistBuddy', ['-c', `Set :ElectronAsarIntegrity:Resources/ion-dist.asar:hash ${hash}`, infoPlist], { encoding: 'utf8' });
+      await rm(join(resourcesDir, 'ion-dist'), { recursive: true });
+    }
     const runtimeLocalePatched = generationOptions.translationMode === 'full'
       ? await patchPackagedRuntime({
         appAsarPath: join(resourcesDir, 'app.asar'),
@@ -616,12 +634,24 @@ export async function buildLocalizedClone({
         workingDir: stagingRoot,
         infoPlist,
         translationMap: webTranslationMap,
+        desktopCatalog: upstream.files.desktop,
         execFile,
       })
       : false;
     if (generationOptions.appMode === 'clone') {
       await execFile('/usr/bin/plutil', ['-replace', 'CFBundleDisplayName', '-string', 'Claude 中文', '--', infoPlist], { encoding: 'utf8' });
       await execFile('/usr/bin/plutil', ['-replace', 'CFBundleIdentifier', '-string', CLONE_BUNDLE_IDENTIFIER, '--', infoPlist], { encoding: 'utf8' });
+    }
+    const frameworkDir = join(stagingPath, 'Contents', 'Frameworks', 'Electron Framework.framework');
+    const frameworkBinary = join(frameworkDir, 'Versions', 'A', 'Electron Framework');
+    if (await exists(frameworkBinary)) {
+      const { stdout } = await execFile('/usr/bin/plutil', ['-convert', 'json', '-o', '-', '--', infoPlist], { encoding: 'utf8' });
+      const integrity = JSON.parse(stdout).ElectronAsarIntegrity;
+      const updated = updateIntegrityDigest(await readFile(frameworkBinary), integrity ?? {});
+      if (updated.slots) {
+        await writeFile(frameworkBinary, updated.data);
+        await execFile('/usr/bin/codesign', ['--force', '--sign', '-', '--timestamp=none', frameworkDir], { encoding: 'utf8' });
+      }
     }
     await writeFile(entitlementsPath, buildCloneEntitlements());
     const helperApps = await readHelperApps(join(stagingPath, 'Contents', 'Frameworks'));
@@ -705,7 +735,7 @@ export async function buildLocalizedClone({
   }
 }
 
-async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, infoPlist, translationMap, execFile = defaultExecFile }) {
+async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, infoPlist, translationMap, desktopCatalog, execFile = defaultExecFile }) {
   if (!(await exists(appAsarPath))) return false;
   const extractionPath = join(workingDir, `.Claude 中文.asar-src-${process.pid}-${Date.now()}`);
   try {
@@ -719,7 +749,16 @@ async function patchPackagedRuntime({ appAsarPath, resourcesDir, workingDir, inf
       mainViewSource,
       translationMap,
     ));
-    await createPackage(extractionPath, appAsarPath);
+    for (const asset of await readJavaScriptAssets(join(extractionPath, '.vite', 'build'))) {
+      const translated = patchNativeDialogMessages(asset.content);
+      if (translated !== asset.content) await writeFile(asset.path, translated);
+    }
+    const shellDirectory = join(extractionPath, 'resources', 'i18n');
+    if (await exists(join(shellDirectory, 'en-US.json'))) {
+      const english = JSON.parse(await readFile(join(shellDirectory, 'en-US.json'), 'utf8'));
+      await writeFile(join(shellDirectory, 'zh-CN.json'), `${JSON.stringify(supplementLocalCatalog('desktop', english, JSON.parse(desktopCatalog)), null, 2)}\n`);
+    }
+    await repackArchive(extractionPath, appAsarPath);
     const hash = computeAsarHeaderIntegrity(await readFile(appAsarPath));
     await execFile('/usr/libexec/PlistBuddy', [
       '-c', `Set :ElectronAsarIntegrity:Resources/app.asar:hash ${hash}`, infoPlist,

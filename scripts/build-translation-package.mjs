@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { selectCompatibleTranslationVersion } from '../src/translation-source.mjs';
 import { LOCAL_TRANSLATION_OVERRIDES } from '../src/local-translation-overrides.mjs';
-import { supplementTranslationEntry } from '../src/local-catalogs.mjs';
+import { supplementTranslationEntry, LOCAL_CATALOG_PATHS } from '../src/local-catalogs.mjs';
 
 export function buildTranslationPackage({ upstream, reference, packageVersion = 'development' }) {
   const files = Object.fromEntries(['ion', 'dynamic', 'desktop'].map((name) => [name, `${JSON.stringify({
@@ -17,7 +17,7 @@ export function buildTranslationPackage({ upstream, reference, packageVersion = 
     sources: [
       { repository: 'ICERainbow666/claude-desktop-zh-cn', commit: upstream.commit },
       { repository: 'javaht/claude-desktop-zh-cn', commit: reference.commit, role: 'fallback keys and locally retained text matches' },
-      { repository: 'kiletry/claude-desktop-mac-zh-cn', path: 'src/translations/claude-3.6556.2.json', role: 'local supplemental translations' },
+      ...LOCAL_CATALOG_PATHS.map(path => ({ repository: 'kiletry/claude-desktop-mac-zh-cn', path, role: 'local supplemental translations' })),
     ],
     translations: [supplementTranslationEntry({ version: upstream.version, commit: upstream.commit, files, english: upstream.english })],
   };

@@ -1,7 +1,12 @@
 import { readFileSync } from 'node:fs';
 
 // Keep source text beside each translation: fallback matching never relies on a stale ID.
-export const LOCAL_CATALOGS = JSON.parse(readFileSync(new URL('./translations/claude-3.6556.2.json', import.meta.url), 'utf8'));
+export const LOCAL_CATALOG_PATHS = ['src/translations/claude-3.6556.2.json', 'src/translations/claude-4.29.0.json'];
+export const LOCAL_CATALOGS = Object.fromEntries(['ion', 'dynamic', 'desktop'].map(name => [name, {}]));
+for (const path of LOCAL_CATALOG_PATHS) {
+  const catalog = JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'));
+  for (const name of Object.keys(LOCAL_CATALOGS)) Object.assign(LOCAL_CATALOGS[name], catalog[name]);
+}
 
 export function localTranslationsByText(name, catalogs = LOCAL_CATALOGS) {
   return Object.fromEntries(Object.values(catalogs[name] ?? {}).map(([from, to]) => [from, to]));
