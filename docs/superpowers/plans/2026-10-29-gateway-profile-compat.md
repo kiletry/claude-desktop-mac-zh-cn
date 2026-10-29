@@ -8,7 +8,7 @@
 
 - [x] Write failing behavioral launcher tests for legacy Gateway migration, existing destination preservation, explicit first-party mode, incomplete source and private files. Execute generated launcher with a fake native binary and temporary profiles.
 - [x] Implement the shell compatibility step, preserve the single `--user-data-dir=...` argument, and seed Chinese locale in both profiles. Final suite: 126 Node and 13 Swift passed. Embedded generator clean check and real Claude 4.29 clone generation/signature verified; official source hashes unchanged.
-- [ ] Update README, installer guide, bundled first-launch notice and release notes. Build v0.1.21 through GitHub Actions, verify downloaded DMG and embedded launcher fix, and give the user the new installer.
+- [x] Update README, installer guide, bundled first-launch notice and release notes. Build v0.1.21 through GitHub Actions, verify downloaded DMG and embedded launcher fix, and give the user the new installer.
 
 Review focus: partial target profiles; malformed JSON; source symlinks; repeated/concurrent launches; user preference preservation. Local secrets must remain outside Git and release artifacts.
 
@@ -20,3 +20,5 @@ Final verification: `npm test` → 126/126; full-Xcode `swift test --package-pat
 Review limits: synthetic credentials cover migration; real Gateway homepage and ConfigHealth were inspected separately, with no inference request. Cowork signature restrictions and older macOS runtime behavior are outside this fix's validation.
 
 CI follow-up: diagnostic traces established that macOS 14 has no lockf executable. Use lockf when present, otherwise system shlock with a dedicated shell owner (not Claude's long-running PID). The missing-lockf concurrent/stale-lock regression passed after first failing; macOS 14 CI is required before the next release tag. v0.1.19 and v0.1.20 never published assets; continue as v0.1.21 without rewriting tags.
+
+Release evidence: macOS 14 launcher CI 40815427021 passed 8/8; release workflow 40815612297 passed all gates and published v0.1.21 from 189a93c. Downloaded all four assets; SHA256SUMS and DMG CRC verified. Mounted DMG passed clean bundle/signature checks, and its embedded launcher exactly matched release source. The downloaded generator successfully generated a real Claude 4.29 clone; generated launcher equality and strict deep codesign verification passed. Artifacts are retained in `dist/release-v0.1.21/` outside Git.
