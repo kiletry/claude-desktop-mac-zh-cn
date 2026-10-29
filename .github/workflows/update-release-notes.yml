@@ -1,6 +1,11 @@
 name: Update published release notes
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - docs/release-notes/v0.1.18.md
+      - .github/workflows/update-release-notes.yml
   workflow_dispatch:
     inputs:
       tag:
@@ -19,7 +24,7 @@ jobs:
       - name: Update notes without changing release assets
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ inputs.tag || 'v0.1.18' }}
         shell: bash
         run: |
           set -euo pipefail
