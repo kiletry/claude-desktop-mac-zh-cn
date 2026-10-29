@@ -31,7 +31,8 @@
 ~/Library/Application Support/Claude Desktop zh-CN
 ```
 
-这与官方 Claude 的数据彼此隔离，首次启动可能需要重新登录。
+Claude `4.29.0` 的第三方 Gateway 模式使用同级的 `Claude Desktop zh-CN-3p`
+目录。这些目录与官方 Claude 的数据彼此隔离，首次启动可能需要重新登录或恢复 Gateway 配置。
 
 ## 官方 Claude 更新后
 
@@ -77,7 +78,9 @@
 初始化方式：使用现有目录
 ```
 
-Gateway/API Key 注入会写入这个中文副本数据目录。注入后左上角可能显示 3P（第三方 /
+Claude `4.29.0` 会读取带 `-3p` 后缀的配置目录；请确认工具实际写入
+`~/Library/Application Support/Claude Desktop zh-CN-3p`，仅写入主目录可能不会生效。
+注入后左上角可能显示 3P（第三方 /
 AI 专用）或 Cowork，且模式选择器可能不可选；这是 Gateway 配置和官方安装校验的限制，
 不是中文界面损坏。供应商还必须提供 Claude Desktop 可用的 Anthropic 兼容接口、认证和
 模型目录。
@@ -93,6 +96,24 @@ AI 专用）或 Cowork，且模式选择器可能不可选；这是 Gateway 配�
 中文副本数据目录。不要让 Cockpit Tools 和 CC Switch 同时管理同一个配置目录，否则会
 覆盖配置。需要 CC Switch 原生支持时，应由 CC Switch 提供可配置的用户数据目录和
 `--user-data-dir` 启动支持；本项目不会修改第三方工具。
+
+### 恢复已有 Gateway/API 配置（Claude 4.29.0）
+
+若中文副本进入官方登录或账号验证页面，但之前使用 Gateway，请先退出中文副本，
+备份中文副本主目录及 `Claude Desktop zh-CN-3p` 中现有的配置文件，再按以下方式恢复：
+
+1. 从自己已有且可用的 `Claude` 或 `Claude-3p` 配置中复制完整的 `configLibrary/`
+   到 `~/Library/Application Support/Claude Desktop zh-CN-3p/configLibrary/`。
+   `_meta.json` 中的 `appliedId` 必须对应同目录下实际存在的配置 JSON 文件。
+2. 在目标目录的 `claude_desktop_config.json` 中合入 `"deploymentMode": "3p"`，
+   保留该文件已有的其他设置；不存在时可创建包含这一字段的 JSON 文件。
+3. 将配置目录和文件权限分别设为仅本人可访问（`700` 和 `600`），然后重新打开中文副本。
+   首页应显示“您正在使用 Gateway”，并出现已配置的模型。
+
+配置中包含 API Key，应仅在本机处理。无需复制官方账号的 Cookie、OAuth Token 或
+Keychain 数据。生成器不会自动导入这些配置。Gateway 配置健康检查通过不等于推理请求
+已经验证；模型调用仍取决于服务商认证和接口兼容性。Cowork 的“无效安装”属于独立副本的
+签名限制，恢复 Gateway 不会解除它。
 
 生成器现在允许主动选择：
 
@@ -117,7 +138,8 @@ AI 专用）或 Cowork，且模式选择器可能不可选；这是 Gateway 配�
 
 若要回滚，只需退出 Claude 中文并把 `/Applications/Claude 中文.app` 移到废纸篓；如需
 同时清除该副本的登录态和配置，再删除
-`~/Library/Application Support/Claude Desktop zh-CN`。这不会影响官方 Claude。以后
+`~/Library/Application Support/Claude Desktop zh-CN`，以及存在时的
+`~/Library/Application Support/Claude Desktop zh-CN-3p`。这不会影响官方 Claude。以后
 重新运行生成器即可再次创建副本。
 
 如果回滚的是“修改官方 Claude”模式，请不要删除备份目录。先退出 Claude，再将备份中的

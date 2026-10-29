@@ -157,9 +157,15 @@ Cockpit Tools 支持自定义 Claude 应用路径和实例用户数据目录。�
 ~/Library/Application Support/Claude-3p/claude_desktop_config.json
 ```
 
-而不是中文副本目录。正确注入后，中文副本目录中应出现
-`claude_desktop_config.json` 和 `configLibrary/_meta.json`，并且 Gateway 配置会使
-Claude 进入 3P（第三方 / AI 专用）模式。
+而不是中文副本目录。Claude `4.29.0` 会在第三方模式下读取带 `-3p` 后缀的目录：
+
+```text
+~/Library/Application Support/Claude Desktop zh-CN-3p
+```
+
+请确认工具实际将 `claude_desktop_config.json` 和 `configLibrary/` 写入这个目录。
+仅写入不带后缀的目录可能仍会进入官方登录流程。恢复步骤见
+[Gateway 配置恢复](docs/GRAPHICAL-INSTALLER.md#恢复已有-gatewayapi-配置claude-4290)。
 
 ### CC Switch
 
