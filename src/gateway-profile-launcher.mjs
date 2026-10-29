@@ -30,37 +30,44 @@ migrate_gateway_profile() (
   /bin/mkdir -p "$target_profile" || return 1
   lock="$target_profile/.claude-zh-gateway-migration.lock"
   [ ! -L "$lock" ] && [ ! -d "$lock" ] || return 1
-  # The inherited descriptor keeps the kernel lock until this subshell exits,
-  # including abnormal exits. Keep the file so concurrent opens share one inode.
-  exec 9>"$lock"
-  /usr/bin/lockf -s -t 5 9 || return 1
+  # Use the file-and-command interface available on older macOS releases.
+  # Keeping the inode serializes concurrent runs; the kernel releases dead locks.
+  /usr/bin/lockf -ks -t 5 "$lock" /bin/sh -s -- "$source_library" "$target_profile" "$source_desktop" <<'CLAUDE_ZH_GATEWAY_MIGRATE'
+  set -eu
+  umask 077
+  source_library="$1"
+  target_profile="$2"
+  source_desktop="$3"
+  target_library="$target_profile/configLibrary"
+  target_desktop="$target_profile/claude_desktop_config.json"
   stage=''
   trap '[ -z "$stage" ] || /bin/rm -rf "$stage"' EXIT
-  [ ! -e "$target_library" ] && [ ! -L "$target_library" ] || return 0
-  stage=$(/usr/bin/mktemp -d "$target_profile/.claude-zh-gateway-stage.XXXXXX") || return 1
-  /usr/bin/ditto "$source_library" "$stage/configLibrary" || return 1
-  /bin/chmod 700 "$stage/configLibrary" || return 1
-  /usr/bin/find "$stage/configLibrary" -type d -exec /bin/chmod 700 {} + || return 1
-  /usr/bin/find "$stage/configLibrary" -type f -exec /bin/chmod 600 {} + || return 1
+  [ ! -e "$target_library" ] && [ ! -L "$target_library" ] || exit 0
+  stage=$(/usr/bin/mktemp -d "$target_profile/.claude-zh-gateway-stage.XXXXXX") || exit 1
+  /usr/bin/ditto "$source_library" "$stage/configLibrary" || exit 1
+  /bin/chmod 700 "$stage/configLibrary" || exit 1
+  /usr/bin/find "$stage/configLibrary" -type d -exec /bin/chmod 700 {} + || exit 1
+  /usr/bin/find "$stage/configLibrary" -type f -exec /bin/chmod 600 {} + || exit 1
   if [ -f "$target_desktop" ]; then
-    /bin/cp "$target_desktop" "$stage/claude_desktop_config.json" || return 1
-    backup=$(/usr/bin/mktemp -d "$target_profile/.claude-zh-gateway-backup.XXXXXX") || return 1
-    /bin/cp "$target_desktop" "$backup/claude_desktop_config.json" || return 1
-    /bin/chmod 600 "$backup/claude_desktop_config.json" || return 1
+    /bin/cp "$target_desktop" "$stage/claude_desktop_config.json" || exit 1
+    backup=$(/usr/bin/mktemp -d "$target_profile/.claude-zh-gateway-backup.XXXXXX") || exit 1
+    /bin/cp "$target_desktop" "$backup/claude_desktop_config.json" || exit 1
+    /bin/chmod 600 "$backup/claude_desktop_config.json" || exit 1
   elif [ -f "$source_desktop" ]; then
-    /bin/cp "$source_desktop" "$stage/claude_desktop_config.json" || return 1
+    /bin/cp "$source_desktop" "$stage/claude_desktop_config.json" || exit 1
   else
-    printf '{}\n' > "$stage/claude_desktop_config.json" || return 1
+    printf '{}\n' > "$stage/claude_desktop_config.json" || exit 1
   fi
   # Empty JSON objects also parse as OpenStep; use unambiguous XML while editing.
-  /usr/bin/plutil -convert xml1 -- "$stage/claude_desktop_config.json" || return 1
-  /usr/bin/plutil -replace deploymentMode -string 3p -- "$stage/claude_desktop_config.json" || return 1
-  /usr/bin/plutil -convert json -- "$stage/claude_desktop_config.json" || return 1
-  /bin/chmod 600 "$stage/claude_desktop_config.json" || return 1
-  /bin/mv -f "$stage/claude_desktop_config.json" "$target_desktop" || return 1
+  /usr/bin/plutil -convert xml1 -- "$stage/claude_desktop_config.json" || exit 1
+  /usr/bin/plutil -replace deploymentMode -string 3p -- "$stage/claude_desktop_config.json" || exit 1
+  /usr/bin/plutil -convert json -- "$stage/claude_desktop_config.json" || exit 1
+  /bin/chmod 600 "$stage/claude_desktop_config.json" || exit 1
+  /bin/mv -f "$stage/claude_desktop_config.json" "$target_desktop" || exit 1
   # Publish the library last: its presence is the completion marker. An earlier
   # failed write leaves the old library absent so a later launch can retry.
-  /bin/mv "$stage/configLibrary" "$target_library" || return 1
+  /bin/mv "$stage/configLibrary" "$target_library" || exit 1
+CLAUDE_ZH_GATEWAY_MIGRATE
 )
 if ! migrate_gateway_profile >/dev/null 2>&1; then
   printf '%s\n' 'Gateway configuration migration could not finish; existing settings were retained.' >&2

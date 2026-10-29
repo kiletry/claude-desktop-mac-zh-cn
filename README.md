@@ -9,7 +9,7 @@
 Anthropic 签名和 Gatekeeper 信任，之后不能再通过生成器的官方源检查。需要重新生成时，必须
 先恢复备份或从官方 DMG 重新安装。日常使用请保留官方 Claude 不变，只更新独立中文副本。
 
-## v0.1.19 Gateway 配置兼容修复
+## v0.1.20 Gateway 配置兼容修复
 
 - 新安装包生成的中文副本会在启动时检查自己的旧数据目录，将有效 Gateway 配置迁移到 Claude `4.29.0` 使用的 `-3p` 目录。
 - 已有第三方配置和明确选择的官方登录模式优先保留；迁移前备份目标设置，保留原有偏好并收紧配置文件权限。
@@ -172,7 +172,7 @@ Cockpit Tools 支持自定义 Claude 应用路径和实例用户数据目录。�
 ```
 
 请确认工具实际将 `claude_desktop_config.json` 和 `configLibrary/` 写入这个目录。
-`v0.1.19` 生成的启动器会在目标没有 `configLibrary` 时迁移中文副本主目录中的有效 Gateway
+`v0.1.20` 生成的启动器会在目标没有 `configLibrary` 时迁移中文副本主目录中的有效 Gateway
 配置；目标已有配置或明确选择官方登录时不会迁移。它不会导入官方 App 的配置。
 旧版仅写入不带后缀的目录可能仍会进入官方登录流程。恢复步骤见
 [Gateway 配置恢复](docs/GRAPHICAL-INSTALLER.md#恢复已有-gatewayapi-配置claude-4290)。

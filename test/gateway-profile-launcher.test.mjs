@@ -141,3 +141,14 @@ test('a lock file left by an exited process does not prevent migration', async (
   await launch();
   assert.deepEqual(JSON.parse(await readFile(join(target, 'configLibrary', '_meta.json'))), metadata);
 });
+
+test('migration uses the lockf file-and-command interface supported by macOS 14', async () => {
+  const { root, profile, target, launch } = await fixture();
+  await writeGateway(profile, { deploymentMode: '3p' });
+  const lockf = join(root, 'legacy-lockf');
+  await writeFile(lockf, '#!/bin/sh\nwhile [ "$#" -gt 0 ]; do\ncase "$1" in -t) shift 2 ;; -*) shift ;; *) break ;; esac\ndone\n[ "$#" -ge 2 ] || exit 64\nexec /usr/bin/lockf -ks -t 5 "$@"\n');
+  await chmod(lockf, 0o755);
+  await writeFile(join(root, 'Claude'), buildCloneLauncherScript().replaceAll('/usr/bin/lockf', `'${lockf}'`));
+  await launch();
+  assert.deepEqual(JSON.parse(await readFile(join(target, 'configLibrary', '_meta.json'))), metadata);
+});
