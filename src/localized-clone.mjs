@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { extractAll } from '@electron/asar';
 import { repackArchive, updateIntegrityDigest } from './asar-resources.mjs';
 import { patchNativeDialogMessages } from './native-dialogs.mjs';
+import { GATEWAY_PROFILE_COMPATIBILITY_SCRIPT } from './gateway-profile-launcher.mjs';
 
 import { downloadCompatibleTranslation } from './translation-source.mjs';
 import { INTERFACE_PASSTHROUGHS, SETTINGS_TRANSLATIONS } from './settings-translations.mjs';
@@ -65,12 +66,17 @@ export function buildCloneLauncherScript() {
     + 'SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\n'
     + 'USER_DATA_DIR="${CLAUDE_DESKTOP_ZH_CN_USER_DATA_DIR:-$HOME/Library/Application Support/Claude Desktop zh-CN}"\n'
     + 'mkdir -p "$USER_DATA_DIR"\n'
-    + 'CONFIG_PATH="$USER_DATA_DIR/config.json"\n'
+    + GATEWAY_PROFILE_COMPATIBILITY_SCRIPT
+    + 'seed_locale() {\n'
+    + 'CONFIG_PATH="$1/config.json"\n'
     + 'if [ -f "$CONFIG_PATH" ]; then\n'
     + '  /usr/bin/plutil -replace locale -string zh-CN -- "$CONFIG_PATH"\n'
     + 'else\n'
     + '  printf \'{\\n\\t"locale": "zh-CN"\\n}\\n\' > "$CONFIG_PATH"\n'
     + 'fi\n'
+    + '}\n'
+    + 'seed_locale "$USER_DATA_DIR"\n'
+    + 'if [ -d "$USER_DATA_DIR-3p" ] && [ ! -L "$USER_DATA_DIR-3p" ]; then seed_locale "$USER_DATA_DIR-3p"; fi\n'
     + 'export CLAUDE_USER_DATA_DIR="$USER_DATA_DIR"\n'
     + 'exec "$SCRIPT_DIR/Claude-bin" --user-data-dir="$USER_DATA_DIR" "$@"\n';
 }

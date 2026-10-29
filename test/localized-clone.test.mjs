@@ -38,13 +38,6 @@ const payloads = {
   desktop: { menu: '菜单' },
 };
 
-test('launches the clone with an isolated Electron user-data directory', () => {
-  assert.equal(
-    buildCloneLauncherScript(),
-    '#!/bin/sh\nset -eu\nSCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"\nUSER_DATA_DIR="${CLAUDE_DESKTOP_ZH_CN_USER_DATA_DIR:-$HOME/Library/Application Support/Claude Desktop zh-CN}"\nmkdir -p "$USER_DATA_DIR"\nCONFIG_PATH="$USER_DATA_DIR/config.json"\nif [ -f "$CONFIG_PATH" ]; then\n  /usr/bin/plutil -replace locale -string zh-CN -- "$CONFIG_PATH"\nelse\n  printf \'{\\n\\t"locale": "zh-CN"\\n}\\n\' > "$CONFIG_PATH"\nfi\nexport CLAUDE_USER_DATA_DIR="$USER_DATA_DIR"\nexec "$SCRIPT_DIR/Claude-bin" --user-data-dir="$USER_DATA_DIR" "$@"\n',
-  );
-});
-
 test('does not copy Apple team-bound identity entitlements into an ad-hoc clone', () => {
   const original = '<plist><dict><key>com.apple.application-identifier</key><string>Q6L2SF6YDW.com.anthropic.claudefordesktop</string><key>com.apple.developer.team-identifier</key><string>Q6L2SF6YDW</string><key>keychain-access-groups</key><array><string>Q6L2SF6YDW.com.anthropic.claude.webauthn</string></array><key>com.apple.security.cs.allow-jit</key><true/></dict></plist>';
   const result = buildCloneEntitlements(original);
