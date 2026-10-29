@@ -149,13 +149,13 @@ test('a lock file left by an exited process does not prevent migration', async (
   assert.deepEqual(JSON.parse(await readFile(join(target, 'configLibrary', '_meta.json'))), metadata);
 });
 
-test('migration uses the lockf file-and-command interface supported by macOS 14', async () => {
+test('migration recovers stale locks and serializes launches when lockf is unavailable', async () => {
   const { root, profile, target, launch } = await fixture();
   await writeGateway(profile, { deploymentMode: '3p' });
-  const lockf = join(root, 'legacy-lockf');
-  await writeFile(lockf, '#!/bin/sh\nwhile [ "$#" -gt 0 ]; do\ncase "$1" in -t) shift 2 ;; -*) shift ;; *) break ;; esac\ndone\n[ "$#" -ge 2 ] || exit 64\nexec /usr/bin/lockf -ks -t 5 "$@"\n');
-  await chmod(lockf, 0o755);
-  await writeFile(join(root, 'Claude'), buildCloneLauncherScript().replaceAll('/usr/bin/lockf', `'${lockf}'`));
-  await launch();
+  await mkdir(target);
+  await writeFile(join(target, '.claude-zh-gateway-migration.lock'), '999999\n');
+  await writeFile(join(root, 'Claude'), buildCloneLauncherScript().replace('[ -x /usr/bin/lockf ]', 'false'));
+  await Promise.all([launch(), launch()]);
   assert.deepEqual(JSON.parse(await readFile(join(target, 'configLibrary', '_meta.json'))), metadata);
+  assert.equal((await readdir(target)).some(n => n.includes('gateway-stage.')), false);
 });

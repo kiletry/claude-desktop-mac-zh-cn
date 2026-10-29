@@ -24,7 +24,7 @@ Claude.app。
 中文副本使用独立数据目录：
 ~/Library/Application Support/Claude Desktop zh-CN
 
-Claude 4.29 的 Gateway 模式读取同级 Claude Desktop zh-CN-3p 目录。v0.1.20 生成的中文副本
+Claude 4.29 的 Gateway 模式读取同级 Claude Desktop zh-CN-3p 目录。v0.1.21 生成的中文副本
 启动时，会在目标没有 configLibrary 时迁移自己主目录中的有效 Gateway 配置，保留目标已有
 配置和明确选择的官方登录模式，并备份被修改的目标设置。它不会导入官方 App 的账号或凭据。
 升级生成器后，请重新点击“生成/更新中文副本”，已生成的 App 才会获得此修复。

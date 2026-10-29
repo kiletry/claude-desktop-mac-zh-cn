@@ -1,6 +1,28 @@
 // Runs with macOS system tools, so launching the clone needs no host Node runtime.
 // Only the clone's own old profile is eligible; existing third-party settings win.
 export const GATEWAY_PROFILE_COMPATIBILITY_SCRIPT = String.raw`
+with_gateway_lock() {
+  gateway_lock="$1"
+  shift
+  if [ -x /usr/bin/lockf ]; then
+    /usr/bin/lockf -ks -t 5 "$gateway_lock" "$@"
+  else
+    # Older macOS includes shlock. Its owner is a dedicated shell process so
+    # a crash cannot leave a lock attributed to the long-running Claude PID.
+    /bin/sh -c '
+      lock="$1"
+      shift
+      attempts=0
+      while ! /usr/bin/shlock -p "$$" -f "$lock"; do
+        attempts=$((attempts + 1))
+        [ "$attempts" -lt 50 ] || exit 1
+        /bin/sleep 0.1
+      done
+      trap "/bin/rm -f \"\$lock\"" EXIT
+      "$@"
+    ' gateway-lock "$gateway_lock" "$@"
+  fi
+}
 migrate_gateway_profile() (
   umask 077
   source_library="$USER_DATA_DIR/configLibrary"
@@ -32,7 +54,7 @@ migrate_gateway_profile() (
   [ ! -L "$lock" ] && [ ! -d "$lock" ] || return 1
   # Use the file-and-command interface available on older macOS releases.
   # Keeping the inode serializes concurrent runs; the kernel releases dead locks.
-  /usr/bin/lockf -ks -t 5 "$lock" /bin/sh -s -- "$source_library" "$target_profile" "$source_desktop" <<'CLAUDE_ZH_GATEWAY_MIGRATE'
+  with_gateway_lock "$lock" /bin/sh -s -- "$source_library" "$target_profile" "$source_desktop" <<'CLAUDE_ZH_GATEWAY_MIGRATE'
   set -eu
   umask 077
   source_library="$1"
