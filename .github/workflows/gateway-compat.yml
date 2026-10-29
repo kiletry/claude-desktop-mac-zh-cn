@@ -1,0 +1,15 @@
+name: Gateway launcher compatibility
+on:
+  push:
+    branches: ['codex/gateway-profile-compat']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: node --test test/gateway-profile-launcher.test.mjs
+        env:
+          CLAUDE_ZH_FIXTURE_TRACE: '1'

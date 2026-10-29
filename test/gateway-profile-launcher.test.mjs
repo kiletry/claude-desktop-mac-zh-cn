@@ -18,11 +18,18 @@ async function fixture() {
   const target = `${profile}-3p`;
   await mkdir(profile);
   const launcher = join(root, 'Claude');
-  await writeFile(launcher, buildCloneLauncherScript());
+  const script = process.env.CLAUDE_ZH_FIXTURE_TRACE
+    ? buildCloneLauncherScript().replace('migrate_gateway_profile >/dev/null 2>&1', 'migrate_gateway_profile 2>"$USER_DATA_DIR/migration-trace.log"').replace('  umask 077', '  set -x\n  umask 077')
+    : buildCloneLauncherScript();
+  await writeFile(launcher, script);
   await writeFile(join(root, 'Claude-bin'), '#!/bin/sh\nprintf "%s\\n" "$@" > "$ARGUMENT_SNAPSHOT"\n');
   await chmod(launcher, 0o755);
   await chmod(join(root, 'Claude-bin'), 0o755);
-  const launch = () => execute(launcher, ['--startup'], { env: { ...process.env, CLAUDE_DESKTOP_ZH_CN_USER_DATA_DIR: profile, ARGUMENT_SNAPSHOT: join(root, 'args.txt') } });
+  const launch = async () => {
+    const result = await execute(launcher, ['--startup'], { env: { ...process.env, CLAUDE_DESKTOP_ZH_CN_USER_DATA_DIR: profile, ARGUMENT_SNAPSHOT: join(root, 'args.txt') } });
+    if (process.env.CLAUDE_ZH_FIXTURE_TRACE && result.stderr) console.error(await readFile(join(profile, 'migration-trace.log'), 'utf8').catch(() => 'No fixture trace'));
+    return result;
+  };
   return { root, profile, target, launch };
 }
 
