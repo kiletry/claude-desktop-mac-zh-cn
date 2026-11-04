@@ -66,3 +66,32 @@ test('generates packed frontend and desktop catalogs while preserving native unp
   assert.deepEqual(await readFile(join(resources,'app.asar')),before);
   await assert.rejects(access(join(out,'ion-dist')));
 });
+
+test('preserves the external upgrade notice beside the frontend archive', async () => {
+  const { root, app, resources } = await fixture();
+  await mkdir(join(resources, 'ion-dist'));
+  const notice = '<!doctype html><h1>Claude was updated</h1>';
+  await writeFile(join(resources, 'ion-dist', 'index.html'), notice);
+  const packageValue = { schemaVersion: 1, translations: [{ version: '4.29.0', files: { ion: '{"general":"通用"}', dynamic: '{}', desktop: '{"menu":"文件"}' }, english: '{"general":"General"}' }] };
+  const result = await buildLocalizedClone({ appDir: app, version: '4.16336.0', outputDir: join(root, 'out'), fetchImpl: async () => ({ok:true,json:async()=>packageValue}), execFile: async(file,args)=>{
+    if(file.endsWith('ditto')) await cp(args[1],args[2],{recursive:true});
+    return {stdout:'',stderr:''};
+  }});
+  const out = join(result.appPath, 'Contents', 'Resources');
+  assert.equal(await readFile(join(out, 'ion-dist', 'index.html'), 'utf8'), notice);
+  assert.equal(await readFile(join(resources, 'ion-dist', 'index.html'), 'utf8'), notice);
+  assert.equal(JSON.parse(extractFile(join(out, 'ion-dist.asar'), 'i18n/zh-CN.json')).general, '通用');
+  assert.throws(() => statFile(join(out, 'ion-dist.asar'), 'index.html'), /not found/);
+  await assert.rejects(access(join(out, 'ion-dist', 'i18n')));
+});
+
+test('continues rejecting unpacked resources conflicting with the frontend archive', async () => {
+  const { root, app, resources } = await fixture();
+  await mkdir(join(resources, 'ion-dist', 'i18n'), { recursive: true });
+  await writeFile(join(resources, 'ion-dist', 'i18n', 'en-US.json'), '{}');
+  const packageValue = { schemaVersion: 1, translations: [{ version: '4.29.0', files: { ion: '{}', dynamic: '{}', desktop: '{}' } }] };
+  await assert.rejects(buildLocalizedClone({ appDir: app, version: '4.16336.0', outputDir: join(root, 'out'), fetchImpl: async () => ({ok:true,json:async()=>packageValue}), execFile: async(file,args)=>{
+    if(file.endsWith('ditto')) await cp(args[1],args[2],{recursive:true});
+    return {stdout:'',stderr:''};
+  }}), /Ambiguous frontend layout/);
+});

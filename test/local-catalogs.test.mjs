@@ -33,3 +33,11 @@ test('uses Claude 4.29 supplements in both frontend fallback and packaged deskto
   assert.equal(JSON.parse(entry.files.ion)['++XvhBJqfj'], '停止与 {org} 共享');
   assert.ok(JSON.parse(entry.files.desktop)['++/vyEBwJg']);
 });
+
+test('includes Claude 4.16336 frontend, desktop and dynamic supplements', () => {
+  const entry = supplementTranslationEntry({ files: { ion: '{}', dynamic: '{}', desktop: '{}' }, english: '{}' });
+  assert.equal(JSON.parse(entry.files.ion)['++K+2h7FZc'], '以参与者身份打开');
+  assert.equal(JSON.parse(entry.files.desktop)['0P+5YSBjZO'], '切换分支？');
+  assert.equal(JSON.parse(entry.files.dynamic)['XPiJIxyAVt'], '推荐');
+  assert.equal(buildWebTranslationMap({ rotated: 'Open as participant' }, {})['Open as participant'], '以参与者身份打开');
+});

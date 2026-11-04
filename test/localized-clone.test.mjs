@@ -126,6 +126,18 @@ test('patches multiple locale registries owned by one current Claude asset', () 
   assert.equal((patched.match(/"zh-CN"/g) ?? []).length, 2);
 });
 
+test('patches locale registries split across current frontend assets', () => {
+  const registry = '["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"]';
+  const result = patchLocaleAssets([
+    { path: 'shared-123.js', content: `var ou=${registry};function pick(e,t=ou){return t}` },
+    { path: 'shared-62.js', content: `var Sb=${registry};function valid(e){return Sb.includes(e)}` },
+    { path: 'other.js', content: 'const name="en-US";' },
+  ]);
+  assert.match(result[0].content, /"zh-CN"/);
+  assert.match(result[1].content, /"zh-CN"/);
+  assert.equal(result[2].content, 'const name="en-US";');
+});
+
 test('patches a locale registry after Claude changes its minified variable name', () => {
   const source = 'var xu=["en-US","de-DE","fr-FR","ko-KR","ja-JP","es-419","es-ES","it-IT","hi-IN","pt-BR","id-ID"];function Mu(e){return e&&xu.includes(e)?e:void 0}';
   const patched = patchLocaleAssets([{ path: 'shared-2-BF65-y49.js', content: source }]);
@@ -142,7 +154,7 @@ test('patches only the one asset that owns the supported locale registry', () =>
   assert.equal(result.find(({ path }) => path === 'other.js').content, 'const value = "en-US";');
   assert.throws(
     () => patchLocaleAssets([{ path: 'a.js', content: 'const value = "en-US";' }]),
-    /exactly one/i,
+    /at least one/i,
   );
 });
 

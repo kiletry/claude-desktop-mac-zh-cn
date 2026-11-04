@@ -1,6 +1,6 @@
 import { CompatibilityError, UserError } from './errors.mjs';
 import { createHash } from 'node:crypto';
-import { access, chmod, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { access, chmod, lstat, mkdir, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { extractAll } from '@electron/asar';
 import { repackArchive, updateIntegrityDigest } from './asar-resources.mjs';
@@ -140,10 +140,11 @@ export function patchLocaleRegistry(source) {
 
 export function patchLocaleAssets(assets) {
   const candidates = assets.filter(({ content }) => findLocaleRegistryMatches(content).length > 0);
-  if (candidates.length !== 1) {
-    throw new CompatibilityError(`Expected exactly one locale registry asset, found ${candidates.length}.`);
+  if (candidates.length === 0) {
+    throw new CompatibilityError('Expected at least one locale registry asset, found 0.');
   }
-  return assets.map((asset) => asset.path === candidates[0].path
+  const paths = new Set(candidates.map(({ path }) => path));
+  return assets.map((asset) => paths.has(asset.path)
     ? { ...asset, content: patchLocaleRegistries(asset.content) }
     : asset);
 }
@@ -562,9 +563,21 @@ export async function buildLocalizedClone({
     const resourcesDir = join(stagingPath, 'Contents', 'Resources');
     const frontendArchive = join(resourcesDir, 'ion-dist.asar');
     const archivedFrontend = await exists(frontendArchive);
+    const frontendDirectory = join(resourcesDir, 'ion-dist');
+    let externalFrontendNotice = null;
     if (archivedFrontend) {
-      if (await exists(join(resourcesDir, 'ion-dist'))) throw new CompatibilityError('Ambiguous frontend layout: both ion-dist and ion-dist.asar exist.');
-      extractAll(frontendArchive, join(resourcesDir, 'ion-dist'));
+      if (await exists(frontendDirectory)) {
+        if (!(await lstat(frontendDirectory)).isDirectory()) {
+          throw new CompatibilityError('Ambiguous frontend layout: external ion-dist must be a regular directory.');
+        }
+        const entries = await readdir(frontendDirectory, { withFileTypes: true });
+        if (entries.length !== 1 || entries[0].name !== 'index.html' || !entries[0].isFile()) {
+          throw new CompatibilityError('Ambiguous frontend layout: both ion-dist and ion-dist.asar exist.');
+        }
+        externalFrontendNotice = await readFile(join(frontendDirectory, 'index.html'));
+        await rm(frontendDirectory, { recursive: true });
+      }
+      extractAll(frontendArchive, frontendDirectory);
     }
     const executableDir = join(stagingPath, 'Contents', 'MacOS');
     const executablePath = join(executableDir, 'Claude');
@@ -632,6 +645,10 @@ export async function buildLocalizedClone({
       const hash = computeAsarHeaderIntegrity(await readFile(frontendArchive));
       await execFile('/usr/libexec/PlistBuddy', ['-c', `Set :ElectronAsarIntegrity:Resources/ion-dist.asar:hash ${hash}`, infoPlist], { encoding: 'utf8' });
       await rm(join(resourcesDir, 'ion-dist'), { recursive: true });
+      if (externalFrontendNotice !== null) {
+        await mkdir(frontendDirectory);
+        await writeFile(join(frontendDirectory, 'index.html'), externalFrontendNotice);
+      }
     }
     const runtimeLocalePatched = generationOptions.translationMode === 'full'
       ? await patchPackagedRuntime({
@@ -678,6 +695,8 @@ export async function buildLocalizedClone({
       })),
       skipped: resourcePlan.skipped,
       localeRegistryAsset: registryAsset?.path.slice(stagingPath.length + 1) ?? null,
+      localeRegistryAssets: patchedAssets.filter((asset, index) => asset.content !== assets[index].content)
+        .map(({ path }) => path.slice(stagingPath.length + 1)),
       runtimeLocalePatched,
       webViewLocalePreloadPatched: runtimeLocalePatched,
       interfaceAuditAssets,
