@@ -41,3 +41,13 @@ test('includes Claude 4.16336 frontend, desktop and dynamic supplements', () => 
   assert.equal(JSON.parse(entry.files.dynamic)['XPiJIxyAVt'], '推荐');
   assert.equal(buildWebTranslationMap({ rotated: 'Open as participant' }, {})['Open as participant'], '以参与者身份打开');
 });
+
+test('includes Claude 4.23118 import messages in public packages and rotated frontend IDs', () => {
+  const entry = supplementTranslationEntry({ files: { ion: '{}', dynamic: '{}', desktop: '{}' }, english: '{}' });
+  const from = 'This file has nothing to import. Choose another file.';
+  const to = '此文件没有可导入的内容。请选择其他文件。';
+  assert.equal(JSON.parse(entry.files.ion)['++CUhQojd6'], to);
+  assert.equal(JSON.parse(entry.english)['++CUhQojd6'], from);
+  assert.equal(JSON.parse(entry.files.desktop)['Uv4EenEj80'], '仅导入会话');
+  assert.equal(buildWebTranslationMap({ rotated: from }, {})[from], to);
+});

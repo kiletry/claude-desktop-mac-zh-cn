@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
 // Keep source text beside each translation: fallback matching never relies on a stale ID.
-export const LOCAL_CATALOG_PATHS = ['src/translations/claude-3.6556.2.json', 'src/translations/claude-4.29.0.json', 'src/translations/claude-4.16336.0.json'];
+export const LOCAL_CATALOG_PATHS = ['src/translations/claude-3.6556.2.json', 'src/translations/claude-4.29.0.json', 'src/translations/claude-4.16336.0.json', 'src/translations/claude-4.23118.0.json'];
 export const LOCAL_CATALOGS = Object.fromEntries(['ion', 'dynamic', 'desktop'].map(name => [name, {}]));
 for (const path of LOCAL_CATALOG_PATHS) {
   const catalog = JSON.parse(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'));
