@@ -22,7 +22,7 @@ env:
 jobs:
   release:
     name: Build and publish macOS generator
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
@@ -130,7 +130,8 @@ jobs:
           cat > "$notes" <<'EOF'
           ## Claude 中文生成器
 
-          - v0.1.23 适配 Claude Desktop 4.23118.0；安装新版生成器后，请重新点击“生成/更新中文副本”。
+          - 发布构建改用 macOS 15 runner，修复旧 macOS 14 runner 不再可用导致发布任务取消的问题。
+          - v0.1.24 适配 Claude Desktop 4.23118.0；安装新版生成器后，请重新点击“生成/更新中文副本”。
           - 同步最新参考仓库和上游 4.29.0.0 词库，新增前端 1,034 条、桌面端 21 条本地补充译文，覆盖数据导入、远程控制、预算与权限等新消息；上游已有译文优先，品牌名、单位和代码示例按需保留。
           - 本地补充通过 ICU 参数、分支与标签校验；131 项 Node、13 项 Swift 测试通过。
           - 新版两份语言注册资源、桌面语言补丁、中文副本生成、签名、中文启动引导和原生菜单已检查；现有 Gateway 配置兼容逻辑继续保留。登录后设置、真实 Gateway 认证和模型调用未验证。
