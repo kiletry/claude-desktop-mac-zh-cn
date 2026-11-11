@@ -84,12 +84,14 @@ test('DMG builder stages only generator app and Applications alias before creati
   await writeFile(hdiutil, `#!/bin/sh
 set -eu
 source=""
+image_size=""
 last=""
 while [ "$#" -gt 0 ]; do
   if [ "$1" = "-srcfolder" ]; then source="$2"; shift 2; continue; fi
+  if [ "$1" = "-size" ]; then image_size="$2"; shift 2; continue; fi
   last="$1"; shift
 done
-node -e 'const fs=require("fs"); const source=process.argv[1]; const out=process.argv[2]; fs.writeFileSync(out, JSON.stringify({names:fs.readdirSync(source).sort(), applicationsIsLink:fs.lstatSync(source + "/Applications").isSymbolicLink(), applicationsTarget:fs.readlinkSync(source + "/Applications")}));' "$source" "$DMG_OBSERVATION"
+node -e 'const fs=require("fs"); const source=process.argv[1]; const out=process.argv[2]; fs.writeFileSync(out, JSON.stringify({imageSize:process.argv[3],names:fs.readdirSync(source).sort(), applicationsIsLink:fs.lstatSync(source + "/Applications").isSymbolicLink(), applicationsTarget:fs.readlinkSync(source + "/Applications")}));' "$source" "$DMG_OBSERVATION" "$image_size"
 touch "$last"
 `);
   await chmod(hdiutil, 0o755);
@@ -105,6 +107,8 @@ touch "$last"
   assert.deepEqual(staged.names, ['Applications', 'Claude 中文生成器.app']);
   assert.equal(staged.applicationsIsLink, true);
   assert.equal(staged.applicationsTarget, '/Applications');
+  assert.match(staged.imageSize, /^[0-9]+k$/);
+  assert.ok(Number(staged.imageSize.slice(0, -1)) > 64 * 1024, 'Image needs filesystem overhead headroom beyond the staged content');
 });
 
 test('bundle verifier rejects a missing embedded runtime before signature checks', async () => {

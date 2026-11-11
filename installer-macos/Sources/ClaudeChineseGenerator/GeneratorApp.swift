@@ -14,7 +14,14 @@ struct ClaudeChineseGeneratorApp: App {
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("检查更新…") {
-                    openWindow(id: "generator")
+                    if let window = NSApplication.shared.windows.first(where: {
+                        $0.title == "Claude 中文生成器" && ($0.isVisible || $0.isMiniaturized)
+                    }) {
+                        if window.isMiniaturized { window.deminiaturize(nil) }
+                        window.makeKeyAndOrderFront(nil)
+                    } else {
+                        openWindow(id: "generator")
+                    }
                     Task { await updater.checkManually() }
                 }
                     .disabled(updater.isChecking || updater.isInstalling)

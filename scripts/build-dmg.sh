@@ -64,10 +64,15 @@ ln -s /Applications "$staging_dir/Applications"
 # hdiutil create produces the final image directly; it does not attach a volume,
 # so there is no mounted image to detach.  This keeps failed builds from leaving
 # a mounted writable volume behind.
+# Its automatic source-folder size estimate can omit filesystem/copy overhead.
+# Reserve 50% plus 64 MiB in the image; UDZO compresses unused space.
+staged_kib="$(du -sk "$staging_dir" | awk '{print $1}')"
+image_kib=$(( staged_kib + staged_kib / 2 + 65536 ))
 hdiutil_bin="${HDIUTIL_BIN:-/usr/bin/hdiutil}"
 "$hdiutil_bin" create \
   -volname 'Claude 中文生成器' \
   -srcfolder "$staging_dir" \
+  -size "${image_kib}k" \
   -ov \
   -format UDZO \
   "$output_path"

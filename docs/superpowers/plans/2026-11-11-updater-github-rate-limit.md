@@ -7,8 +7,21 @@ Fix: publish API-schema-compatible `generator-update.json` alongside each stable
 - [x] Regression tests RED: existing API-only implementation fails public-primary success, missing-public fallback ordering, dual error diagnosis, and metadata-only request assertion. Node manifest test fails missing script.
 - [x] Implement primary public metadata + API fallback and release manifest generation/publication.
 - [x] Full Swift/Node tests and independent review.
-- [ ] Publish v0.1.27 and verify downloaded public asset hashes/bundle/source and real unauthenticated startup/manual check from current rate-limited network.
+- [x] Publish v0.1.27 and verify downloaded public asset hashes/bundle/source and real unauthenticated startup/manual check from current rate-limited network.
 
 Maintain previous writable installed-target policy and explicit installation flow. No official Claude/profile/Gateway configuration changes. v0.1.26 cannot receive the client code fix through a rate-limited API, so supply new manual installation DMG.
 
 Validation before publication: Node145/145; Swift31/31 with public v0.1.25 real DMG fixture enabled. RED log `/tmp/generator-feed-red.log`, GREEN `/tmp/generator-feed-green.log`, Node `/tmp/generator-feed-all-node.log`.
+
+
+## v0.1.27 publication and followup
+
+- Tagba23a46; run43013051706 attempt1 failed hdiutil DMG creation with No space left on device; same immutable tag retried from authenticated GitHub UI (CLI token lacks rerun permission). Attempt2 passed all gates and published five assets. Public downloaded DMG/tgz/translation SHA256SUMS all pass; manifest sizes match actual files; strict deep signature, universal binary, manifest sourceCommit, source archive comparison and clean CLI check pass.
+- Actual unauthenticated production updater network check from this machine succeeded twice via public JSON alone: current0.1.26 offers v0.1.27, current0.1.27 offers none. Same-time anonymous API stillHTTP403. Public DMG launched and startup/manual menu showed “生成器 v0.1.27 · 已是最新版本”.
+- User immediately reported menu opens a second interface. Reproduced in CUA: original WindowGroup scene generator-AppWindow-1 becomes a newly opened generator-AppWindow-2 after menu calls openWindow. Cause is using openWindow with a multiple-instance WindowGroup. Initial Window scene replacement was rejected by review because closing the primary Window quits the app (would change background generation/update behavior). Final fix preserves WindowGroup and locates the visible/minimized existing main NSWindow by its exact title; deminiaturizes/focuses it, calls openWindow only when none exists.
+- [ ] v0.1.28: build and live UI regression: repeat menu checks with existing window (same window ID/count), close and reopen via menu (single window), verify metadata check succeeds; publish replacement DMG and verify public artifact.
+
+- UI regression is temporarily blocked: CUA reported Mac locked and automatic unlock failed before interacting with local v0.1.28. Build/tests and review proceed; final repeated-menu and close/reopen verification requires manual unlock. No v0.1.28 tag/release published yet.
+
+- Review recheck approved final WindowGroup+existing-window focus implementation. Local automated checks:145 Node,31 Swift all pass; universal executable built and local v0.1.28 DMG signed/clean CLI verified.
+- Local DMG creation reproduced v0.1.27 CI's No-space failure inside temporary `/Volumes/Claude 中文生成器`, while host had90GiB free. This refines the earlier runner-space diagnosis: source-folder image auto-sizing can be too small. Added explicit image capacity of staged allocation +50%+64MiB. Distribution fixture RED then GREEN7/7; real local DMG now builds and clean bundle check passes. This packaging fix is included in v0.1.28.
