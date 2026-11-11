@@ -52,3 +52,6 @@ v0.1.25 适配 Claude 5.1231.2，检查两个翻译仓库并补上参考仓库�
 请将生成器放入可写的 /Applications 或 ~/Applications；从 DMG 等其他位置运行时请手动安装。
 网络检查失败不影响生成。安装更新后仍需点击“生成/更新中文副本”，已有中文 App 才会更新。
 更新失败会保留或恢复旧生成器；详情见 ~/Library/Logs/ClaudeChineseGenerator/update-install.log。
+
+v0.1.27 修复 GitHub 匿名 API 限流导致检查失败：优先获取 Release 的公开版本信息，失败再尝试 API。
+仍只检查版本，点击安装后才下载 DMG。v0.1.26 遇到限流时，请先手动安装本版一次。

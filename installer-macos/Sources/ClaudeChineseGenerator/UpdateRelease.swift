@@ -54,7 +54,8 @@ struct UpdateHTTPClient: UpdateHTTPFetching {
         guard let response = response as? HTTPURLResponse, (200...299).contains(response.statusCode),
               let url = response.url, url.scheme == "https", url.user == nil, url.password == nil,
               ["api.github.com", "github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com"].contains(url.host ?? "") else {
-            throw UpdateError("无法从 GitHub 获取更新，请稍后重试。")
+            let status = (response as? HTTPURLResponse).map { "（HTTP \($0.statusCode)）" } ?? ""
+            throw UpdateError("无法从 GitHub 获取更新\(status)，请稍后重试。")
         }
     }
     func data(from url: URL) async throws -> Data {
@@ -78,13 +79,24 @@ protocol GeneratorUpdateChecking: Sendable {
 }
 
 struct GitHubUpdateService: GeneratorUpdateChecking {
+    static let publicMetadataURL = URL(string: "https://github.com/kiletry/claude-desktop-mac-zh-cn/releases/latest/download/generator-update.json")!
     static let latestReleaseURL = URL(string: "https://api.github.com/repos/kiletry/claude-desktop-mac-zh-cn/releases/latest")!
     let http: any UpdateHTTPFetching
     init(http: any UpdateHTTPFetching = UpdateHTTPClient()) { self.http = http }
 
     func check(currentVersion: String) async throws -> GeneratorRelease? {
         let current = try GeneratorVersion(currentVersion)
-        let response = try JSONDecoder().decode(ReleaseResponse.self, from: await http.data(from: Self.latestReleaseURL))
+        let metadata: Data
+        do {
+            metadata = try await http.data(from: Self.publicMetadataURL)
+        } catch {
+            let publicError = error.localizedDescription
+            do { metadata = try await http.data(from: Self.latestReleaseURL) }
+            catch { throw UpdateError("公开版本信息获取失败：\(publicError) GitHub API 也不可用：\(error.localizedDescription) 可从 Release 页面手动下载。") }
+        }
+        // Both sources use the same strict schema and repository/asset checks.
+        // Invalid metadata is never bypassed by trying a less strict source.
+        let response = try JSONDecoder().decode(ReleaseResponse.self, from: metadata)
         guard !response.draft, !response.prerelease else { return nil }
         let version = try GeneratorVersion(response.tag_name)
         guard version > current else { return nil }

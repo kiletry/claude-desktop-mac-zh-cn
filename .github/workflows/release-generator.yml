@@ -115,9 +115,10 @@ jobs:
           npm run verify:generator-bundle -- --clean-check "$app"
           npm pack --pack-destination dist/release
           (cd dist/release && shasum -a 256 *.dmg *.tgz *.json > SHA256SUMS)
+          node scripts/build-update-metadata.mjs --release-dir dist/release --tag "$RELEASE_TAG"
           [[ "$(find dist/release -maxdepth 1 -name '*.dmg' -type f | wc -l | tr -d ' ')" == 1 ]]
           [[ "$(find dist/release -maxdepth 1 -name '*.tgz' -type f | wc -l | tr -d ' ')" == 1 ]]
-          [[ "$(find dist/release -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')" == 1 ]]
+          [[ "$(find dist/release -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')" == 2 ]]
           [[ "$(find dist/release -maxdepth 1 -name 'SHA256SUMS' -type f | wc -l | tr -d ' ')" == 1 ]]
 
       - name: Publish exactly the verified release files
@@ -128,8 +129,11 @@ jobs:
           set -euo pipefail
           notes="$(mktemp)"
           cat > "$notes" <<'EOF'
-          ## Claude 中文生成器 v0.1.26
+          ## Claude 中文生成器 v0.1.27
 
+          - 修复“重新检查后无法从 GitHub 获取更新”：旧版仅使用 GitHub 匿名 API，共享出口额度耗尽后一直返回 HTTP403。
+          - 优先读取 Release 公开的 generator-update.json；不依赖匿名 API 额度，该通道不可用时再尝试 API。
+          - 两个通道均失败时显示具体原因。v0.1.26 遇到限流时需要先手动安装本版一次。
           - 每次启动检查生成器最新正式版，并提供“检查更新…”菜单；发现新版提示“安装并重启”。
           - 检查只请求版本信息，不自动下载；点击“安装并重启”后才下载 DMG 和 SHA256SUMS。
           - 下载后验证 SHA-256、应用标识、版本及签名，安装助手就绪后退出、替换并重启；失败时保留或恢复原生成器。
@@ -138,12 +142,13 @@ jobs:
           - 延续 Claude Desktop 5.1231.2 翻译适配及 Gateway 配置迁移逻辑。登录后设置、真实 Gateway 认证和模型调用未新增验证。
           - 保留旧版生成器备份；不会自动导入官方 App 的账号、API Key、Cookie 或 Keychain。
           - 生成器和中文副本使用临时签名，不是 Anthropic 官方签名或 Apple 公证。需要官方 Team ID、Cowork 或 Claude Code 时请使用官方 Claude.app。
-          - 发布通用 arm64/x86_64 生成器 DMG、CLI 源码包、公共翻译包和 SHA256SUMS；不包含 Claude.app。
+          - 发布通用 arm64/x86_64 生成器 DMG、CLI 源码包、公共翻译包、SHA256SUMS 和公开版本信息；不包含 Claude.app。
           EOF
           gh release create "$RELEASE_TAG" \
             dist/release/*.dmg \
             dist/release/*.tgz \
             dist/release/claude-zh-translations.json \
+            dist/release/generator-update.json \
             dist/release/SHA256SUMS \
             --verify-tag \
             --title "Claude 中文生成器 $RELEASE_TAG" \

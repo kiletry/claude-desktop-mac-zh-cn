@@ -15,7 +15,39 @@ final class UpdateReleaseTests: XCTestCase {
         let client = UpdateFixtureHTTP(data: releaseJSON())
         let release = try await GitHubUpdateService(http: client).check(currentVersion: "0.1.9")
         XCTAssertEqual(release?.version.description, "0.1.10")
-        XCTAssertEqual(client.requests, [GitHubUpdateService.latestReleaseURL])
+        XCTAssertEqual(client.requests.map(\.absoluteString), ["https://github.com/kiletry/claude-desktop-mac-zh-cn/releases/latest/download/generator-update.json"])
+        XCTAssertEqual(client.downloads, 0)
+    }
+
+    func testPublicMetadataWorksWhenAnonymousAPIIsRateLimited() async throws {
+        let client = RoutedUpdateHTTP()
+        let release = try await GitHubUpdateService(http: client).check(currentVersion: "0.1.9")
+        XCTAssertEqual(release?.tag, "v0.1.10")
+        XCTAssertEqual(client.requests.count, 1)
+        XCTAssertEqual(client.downloads, 0)
+    }
+
+    func testMissingPublicMetadataFallsBackToAPIForOlderReleases() async throws {
+        let client = RoutedUpdateHTTP()
+        client.publicUnavailable = true
+        client.apiUnavailable = false
+        let release = try await GitHubUpdateService(http: client).check(currentVersion: "0.1.9")
+        XCTAssertEqual(release?.tag, "v0.1.10")
+        XCTAssertEqual(client.requests.map(\.host), ["github.com", "api.github.com"])
+        XCTAssertEqual(client.downloads, 0)
+    }
+
+    func testBothMetadataSourcesUnavailableProduceAnActionableError() async {
+        let client = RoutedUpdateHTTP()
+        client.publicUnavailable = true
+        do {
+            _ = try await GitHubUpdateService(http: client).check(currentVersion: "0.1.9")
+            XCTFail("Expected error")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("公开版本信息"))
+            XCTAssertTrue(error.localizedDescription.contains("GitHub API"))
+        }
+        XCTAssertEqual(client.requests.count, 2)
         XCTAssertEqual(client.downloads, 0)
     }
 
@@ -63,4 +95,24 @@ final class UpdateFixtureHTTP: UpdateHTTPFetching, @unchecked Sendable {
     init(data: Data) { fixture = data }
     func data(from url: URL) async throws -> Data { requests.append(url); return fixture }
     func download(from url: URL, to destination: URL) async throws { downloads += 1; try fixture.write(to: destination) }
+}
+
+private final class RoutedUpdateHTTP: UpdateHTTPFetching, @unchecked Sendable {
+    var requests: [URL] = []
+    var downloads = 0
+    var publicUnavailable = false
+    var apiUnavailable = true
+    func data(from url: URL) async throws -> Data {
+        requests.append(url)
+        if url.host == "api.github.com" {
+            if apiUnavailable { throw UpdateError("GitHub API HTTP403 限流") }
+        } else {
+            if publicUnavailable { throw UpdateError("公开版本信息 HTTP404") }
+        }
+        return releaseJSON()
+    }
+    func download(from url: URL, to destination: URL) async throws {
+        downloads += 1
+        XCTFail("Check must not download an installer")
+    }
 }
