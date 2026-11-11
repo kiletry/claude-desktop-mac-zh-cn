@@ -2,32 +2,50 @@ import SwiftUI
 
 @main
 struct ClaudeChineseGeneratorApp: App {
+    @Environment(\.openWindow) private var openWindow
     @StateObject private var viewModel = GeneratorViewModel()
+    @StateObject private var updater = GeneratorUpdateModel(checker: GitHubUpdateService(), installer: GeneratorUpdateInstaller())
 
     var body: some Scene {
-        WindowGroup("Claude 中文生成器") {
-            GeneratorWindow(viewModel: viewModel)
+        WindowGroup("Claude 中文生成器", id: "generator") {
+            GeneratorWindow(viewModel: viewModel, updater: updater)
                 .frame(minWidth: 620, minHeight: 520)
+        }
+        .commands {
+            CommandGroup(after: .appInfo) {
+                Button("检查更新…") {
+                    openWindow(id: "generator")
+                    Task { await updater.checkManually() }
+                }
+                    .disabled(updater.isChecking || updater.isInstalling)
+            }
         }
     }
 }
 
 private struct GeneratorWindow: View {
     @ObservedObject var viewModel: GeneratorViewModel
+    @ObservedObject var updater: GeneratorUpdateModel
     @State private var replacementAlertPresented = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        ScrollView {
+          VStack(alignment: .leading, spacing: 20) {
             Text("Claude 中文生成器")
                 .font(.largeTitle.bold())
+            updateSection
+            if let notice = updater.installationNotice {
+                Text(notice).font(.callout).foregroundStyle(.secondary)
+            }
             inspectionCard
-            configurationSection
+            configurationSection.disabled(viewModel.updateInstallationInProgress)
             statusSection
             limitations
             Spacer(minLength: 0)
-            actionArea
+            actionArea.disabled(viewModel.updateInstallationInProgress)
         }
         .padding(28)
+        }
         .alert("覆盖现有中文副本？", isPresented: $replacementAlertPresented) {
             Button("取消", role: .cancel) { viewModel.dismissReplacementConfirmation() }
             Button(viewModel.configuration.appMode == .official ? "确认修改官方 Claude" : "确认覆盖", role: .destructive) {
@@ -37,8 +55,51 @@ private struct GeneratorWindow: View {
             Text(viewModel.configuration.appMode == .official ? "这会先备份再修改官方 /Applications/Claude.app。修改后它会失去 Anthropic 官方签名和 Gatekeeper 信任，之后不能再作为可信官方源检查；需要重新生成时，必须先恢复备份或从官方 DMG 重新安装。" : "这会更新 /Applications/Claude 中文.app；不会修改官方 Claude.app。中文副本使用本机临时签名，可能无法通过 Cowork、Claude Code 或其他官方安装检查。")
         }
         .task { await viewModel.check() }
+        .task { await updater.checkOnLaunch() }
         .onChange(of: viewModel.state) { state in
             replacementAlertPresented = state == .confirmingReplacement
+        }
+    }
+
+    @ViewBuilder
+    private var updateSection: some View {
+        switch updater.state {
+        case .idle:
+            EmptyView()
+        case .checking:
+            Label("正在检查生成器更新…", systemImage: "arrow.triangle.2.circlepath").font(.caption).foregroundStyle(.secondary)
+        case .upToDate:
+            Text("生成器 v\(updater.currentVersion) · 已是最新版本").font(.caption).foregroundStyle(.secondary)
+        case let .available(release):
+            GroupBox {
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("生成器 v\(release.version.description) 可用", systemImage: "arrow.down.app")
+                        Text("当前 v\(updater.currentVersion) · 点击安装后才会下载。更新后可重新生成中文副本。")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Link("查看更新说明", destination: release.pageURL).font(.caption)
+                    }
+                    Spacer()
+                    Button("安装并重启") {
+                        Task {
+                            await updater.install(acquire: viewModel.beginGeneratorUpdate, release: viewModel.endGeneratorUpdate, terminate: { NSApplication.shared.terminate(nil) })
+                        }
+                    }
+                    .disabled(!viewModel.canInstallGeneratorUpdate)
+                }
+            }
+        case .installing, .restarting:
+            HStack {
+                ProgressView().controlSize(.small)
+                Text(updater.state == .restarting ? "正在重启生成器…" : "正在下载并校验更新，完成后将重启…").font(.callout)
+            }
+        case let .failed(message):
+            HStack {
+                Text(message).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                Spacer()
+                Button("重试检查") { Task { await updater.checkManually() } }
+                Link("手动下载", destination: URL(string: "https://github.com/kiletry/claude-desktop-mac-zh-cn/releases/latest")!)
+            }
         }
     }
 
@@ -86,7 +147,7 @@ private struct GeneratorWindow: View {
                 Text("请确认这是从 Anthropic 安装的原始 /Applications/Claude.app。已被中文生成器修改或重签名的应用不能再次作为官方源；请恢复备份或重新安装官方 Claude。")
                     .font(.caption)
                     .fixedSize(horizontal: false, vertical: true)
-                Button("从默认备份恢复官方 Claude") { Task { await viewModel.restoreOfficialBackup() } }
+                Button("从默认备份恢复官方 Claude") { Task { await viewModel.restoreOfficialBackup() } }.disabled(viewModel.updateInstallationInProgress)
             default:
                 Text("检查结果会显示在这里。")
             }

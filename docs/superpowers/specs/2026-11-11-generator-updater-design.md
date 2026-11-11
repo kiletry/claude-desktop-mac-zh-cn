@@ -1,0 +1,11 @@
+# Generator startup update check
+
+User choice: check on every generator launch. If a newer version exists, show an installation prompt; never download automatically. The previously proposed action is “安装并重启”. This updates the generator itself. Existing localized Claude clones receive new translations only when regenerated explicitly.
+
+Use the existing GitHub public releases and macOS DMG distribution, Swift URLSession and CryptoKit, and a small bundled installer helper. No framework dependency or separate update server. Alternatives considered: download-page-only prompts do not deliver in-app installation; Sparkle requires a new feed/signing/release integration. Reuse the current DMG/checksum pipeline for this scope.
+
+On launch check GitHub releases/latest once per process concurrently with official Claude inspection; expose a manual menu action. Use numeric stable semantic versions, ignore drafts/prereleases/older/equal versions, require exact expected DMG plus SHA256SUMS from this repository over HTTPS. Checking never fetches assets. Show current/new version and release link; the user can defer. Startup failure is unobtrusive, with retry available. No persistent automatic-download setting.
+
+After an explicit install action, download to a private temporary directory, verify exact SHA-256 against the release checksum file, mount the DMG read-only, validate bundle ID, exact expected version and strict signature, stage a copy next to the installed generator, then launch a detached helper and quit. Block generation/restore and installation overlap. Updates require a writable installed generator in /Applications or ~/Applications; DMG/translocated/other copies get clear manual installation guidance. Preserve existing generator and roll back if replacement/validation fails. Never touch official Claude, generated clone or user credentials/profiles. Private helper log records installation errors without secrets.
+
+Tests exercise version and release validation, no-download checks, startup-once behavior, explicit install transition, failures, checksum rejection, candidate identity, actual helper replacement/rollback/timeout behavior. Build and test arm64/x64 generator, package the helper, verify DMG and source; publish v0.1.26 under established release authorization. UI automation may be unavailable; report tested limits accurately.

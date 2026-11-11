@@ -59,6 +59,7 @@ export async function buildGeneratorApp({
   await Promise.all([
     ...runtimeNames.map((name) => cp(runtimePaths[name], join(resources, 'runtime', name), { force: true })),
     cp(firstLaunchReadme, join(resources, 'README-first-launch.txt'), { force: true }),
+    cp(join(sourceRoot, 'installer-macos', 'Resources', 'install-update.sh'), join(resources, 'install-update.sh'), { force: true }),
     cp(join(sourceRoot, 'installer-macos', 'Resources', 'ClaudeChineseGenerator.icns'), join(resources, 'ClaudeChineseGenerator.icns'), { force: true }),
     ...(translationPackage ? [cp(resolve(translationPackage), join(resources, 'runtime', 'translation-package.json'), { force: true })] : []),
   ]);

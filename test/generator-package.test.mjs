@@ -27,6 +27,7 @@ async function fixture() {
   await writeFile(join(rootDir, 'node_modules', 'safe-package', 'index.js'), 'export default true;\n');
   await writeFile(join(rootDir, 'node_modules', '.pnpm', 'minimatch@10.0.1', 'node_modules', 'minimatch', 'package.json'), '{"name":"minimatch","version":"10.0.1"}\n');
   await writeFile(join(rootDir, 'installer-macos', 'Resources', 'README-first-launch.txt'), 'first launch\n');
+  await writeFile(join(rootDir, 'installer-macos', 'Resources', 'install-update.sh'), '#!/bin/sh\nexit 0\n');
   await writeFile(join(rootDir, 'installer-macos', 'Resources', 'ClaudeChineseGenerator.icns'), 'icon');
   await writeFile(join(runtimeDir, 'node-arm64'), 'arm runtime');
   await writeFile(join(runtimeDir, 'node-x64'), 'x64 runtime');
@@ -53,6 +54,7 @@ test('builds an app with both embedded Node runtimes and a resource manifest', a
   assert.match(plist, /CFBundleShortVersionString.*2\.4\.6/);
   assert.match(plist, /CFBundleIconFile.*ClaudeChineseGenerator\.icns/);
   assert.equal(await exists(join(resourceRoot, 'ClaudeChineseGenerator.icns')), true);
+  assert.equal(await readFile(join(resourceRoot, 'install-update.sh'), 'utf8'), '#!/bin/sh\nexit 0\n');
 });
 
 test('rejects a runtime directory without both architecture binaries', async () => {

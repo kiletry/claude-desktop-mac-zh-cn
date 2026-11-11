@@ -143,6 +143,21 @@ final class GeneratorStateTests: XCTestCase {
         XCTAssertTrue(bridge.wasCancelled)
     }
 
+    func testUpdateLockExcludesInspectionRestoreAndGenerationUntilReleased() async {
+        let bridge = StubBridge(events: [trustedInspectionEvent()])
+        let viewModel = GeneratorViewModel(bridge: bridge, outputAppURL: uniqueTemporaryURL())
+        await viewModel.check()
+        XCTAssertTrue(viewModel.beginGeneratorUpdate())
+        XCTAssertFalse(viewModel.beginGeneratorUpdate())
+        await viewModel.check()
+        await viewModel.restoreOfficialBackup()
+        await viewModel.confirmAndGenerate()
+        XCTAssertEqual(bridge.runCallCount, 1)
+        viewModel.endGeneratorUpdate()
+        await viewModel.check()
+        XCTAssertEqual(bridge.runCallCount, 2)
+    }
+
     private func uniqueTemporaryURL() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     }

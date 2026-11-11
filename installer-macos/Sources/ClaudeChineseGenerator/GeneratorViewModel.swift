@@ -6,6 +6,8 @@ import SwiftUI
 final class GeneratorViewModel: ObservableObject {
     @Published private(set) var state: GeneratorState = .checking
     @Published var configuration = GenerationConfiguration()
+    @Published private(set) var updateInstallationInProgress = false
+    @Published private(set) var bridgeOperationInProgress = false
 
     private let bridge: GeneratorProcessRunning
     private let outputAppURL: URL
@@ -37,7 +39,24 @@ final class GeneratorViewModel: ObservableObject {
         self.commandPrefix = commandPrefix
     }
 
+    var canInstallGeneratorUpdate: Bool {
+        guard !updateInstallationInProgress, !bridgeOperationInProgress, generationTask == nil else { return false }
+        if case .confirmingReplacement = state { return false }
+        return true
+    }
+
+    func beginGeneratorUpdate() -> Bool {
+        guard canInstallGeneratorUpdate else { return false }
+        updateInstallationInProgress = true
+        return true
+    }
+
+    func endGeneratorUpdate() { updateInstallationInProgress = false }
+
     func check() async {
+        guard !updateInstallationInProgress, !bridgeOperationInProgress, generationTask == nil else { return }
+        bridgeOperationInProgress = true
+        defer { bridgeOperationInProgress = false }
         state = .checking
         var inspection: Inspection?
         do {
@@ -65,7 +84,7 @@ final class GeneratorViewModel: ObservableObject {
     }
 
     func confirmAndGenerate() async {
-        guard lastTrustedInspection != nil else { return }
+        guard !updateInstallationInProgress, !bridgeOperationInProgress, lastTrustedInspection != nil else { return }
         let replacementConfirmed: Bool
         switch state {
         case .ready:
@@ -122,6 +141,9 @@ final class GeneratorViewModel: ObservableObject {
     }
 
     func restoreOfficialBackup() async {
+        guard !updateInstallationInProgress, !bridgeOperationInProgress, generationTask == nil else { return }
+        bridgeOperationInProgress = true
+        state = .checking
         do {
             let result = try await bridge.run(
                 arguments: commandPrefix + ["restore-official", "--backup-dir", configuration.backupDirectoryURL.path],
@@ -129,10 +151,12 @@ final class GeneratorViewModel: ObservableObject {
                 onEvent: { _ in }
             )
             latestLogURL = result.logURL
+            bridgeOperationInProgress = false
             await check()
         } catch {
             state = failureState(from: error)
         }
+        bridgeOperationInProgress = false
     }
 
     private func generate() async {
