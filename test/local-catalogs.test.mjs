@@ -51,3 +51,10 @@ test('includes Claude 4.23118 import messages in public packages and rotated fro
   assert.equal(JSON.parse(entry.files.desktop)['Uv4EenEj80'], '仅导入会话');
   assert.equal(buildWebTranslationMap({ rotated: from }, {})[from], to);
 });
+
+test('ships Claude 5.1231 browser permission messages and handles rotated frontend IDs', () => {
+  const entry = supplementTranslationEntry({ files: { ion: '{}', dynamic: '{}', desktop: '{}' }, english: '{}' });
+  assert.equal(JSON.parse(entry.files.desktop)['6hyB65pye3'], '添加扩展程序');
+  assert.equal(JSON.parse(entry.files.ion)['+009HM9SK7'], '关闭敏感内容');
+  assert.equal(buildWebTranslationMap({ rotated: 'Close anything sensitive' }, {})['Close anything sensitive'], '关闭敏感内容');
+});

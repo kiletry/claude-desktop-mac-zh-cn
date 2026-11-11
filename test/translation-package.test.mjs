@@ -26,12 +26,14 @@ const { buildTranslationPackage, downloadTranslationSources } = await import('..
 
 test('builds release catalogs with upstream priority, local supplements, and exact provenance', () => {
   const value = buildTranslationPackage({
-    upstream: { commit: 'ice-sha', version: '2.19675.0', files: { ion: '{"shared":"上游"}', dynamic: '{}', desktop: '{}' }, english: '{}' },
-    reference: { commit: 'javaht-sha', files: { ion: '{"shared":"参考","fallback":"补充"}' } },
+    upstream: { commit: 'ice-sha', version: '2.19675.0', files: { ion: '{"shared":"上游"}', dynamic: '{"sharedDynamic":"上游动态"}', desktop: '{}' }, english: '{}' },
+    reference: { commit: 'javaht-sha', files: { ion: '{"shared":"参考","fallback":"补充"}', dynamic: '{"sharedDynamic":"参考动态","fallbackDynamic":"动态补充"}' } },
     packageVersion: 'v0.1.17',
   });
   assert.equal(value.packageVersion, 'v0.1.17');
   assert.equal(value.sources[1].commit, 'javaht-sha');
+  assert.equal(JSON.parse(value.translations[0].files.dynamic).sharedDynamic, '上游动态');
+  assert.equal(JSON.parse(value.translations[0].files.dynamic).fallbackDynamic, '动态补充');
   assert.equal(JSON.parse(value.translations[0].files.ion).shared, '上游');
   assert.equal(JSON.parse(value.translations[0].files.ion).fallback, '补充');
   assert.equal(JSON.parse(value.translations[0].files.desktop)['+4ABv8PeZM'], '允许手机和 claude.ai 在此电脑上启动会话？');
@@ -46,11 +48,12 @@ test('downloads only complete version catalogs using resolved commits', async ()
       : url.includes('/commits/main') ? { sha: ref }
         : url.includes('/git/trees/') ? { tree: [
           '2.0/ion-dist/zh-CN.json', '2.0/ion-dist/dynamic/zh-CN.json', '2.0/desktop-shell/zh-CN.json', '3.0/ion-dist/zh-CN.json',
-        ].map((path) => ({ path: `translated-zh-CN/${path}` })) } : { encoding: 'base64', content: Buffer.from('{}').toString('base64') };
+        ].map((path) => ({ path: `translated-zh-CN/${path}` })) } : { encoding: 'base64', content: Buffer.from(url.includes('/resources/dynamic-zh-CN.json') ? '{"referenceDynamic":"参考动态"}' : '{}').toString('base64') };
     return { ok: true, json: async () => json, text: async () => '{}' };
   });
   assert.equal(sources.upstream.version, '2.0');
   assert.equal(sources.reference.commit, ref);
-  assert.equal(requests.length, 9);
+  assert.equal(requests.length, 10);
+  assert.equal(sources.reference.files.dynamic, '{"referenceDynamic":"参考动态"}');
   assert.ok(requests.filter((url) => url.includes('/contents/')).every((url) => url.includes(ice) || url.includes(ref)));
 });

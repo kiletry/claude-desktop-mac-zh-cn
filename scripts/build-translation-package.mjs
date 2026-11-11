@@ -43,17 +43,18 @@ export async function downloadTranslationSources(fetchImpl = fetch) {
   const version = selectCompatibleTranslationVersion('9999.9999.9999', versions);
   const base = `https://api.github.com/repos/${ice}/contents/translated-zh-CN`;
   const refBase = `https://api.github.com/repos/${javaht}/contents/resources`;
-  const [ion, dynamic, desktop, english, frontendReference, desktopReference] = await Promise.all([
+  const [ion, dynamic, desktop, english, frontendReference, dynamicReference, desktopReference] = await Promise.all([
     getText(`${base}/${version}/ion-dist/zh-CN.json?ref=${upstreamRevision.sha}`),
     getText(`${base}/${version}/ion-dist/dynamic/zh-CN.json?ref=${upstreamRevision.sha}`),
     getText(`${base}/${version}/desktop-shell/zh-CN.json?ref=${upstreamRevision.sha}`),
     getText(`${base}/ion-dist/en-US.json?ref=${upstreamRevision.sha}`),
     getText(`${refBase}/frontend-zh-CN.json?ref=${referenceRevision.sha}`),
+    getText(`${refBase}/dynamic-zh-CN.json?ref=${referenceRevision.sha}`),
     getText(`${refBase}/desktop-zh-CN.json?ref=${referenceRevision.sha}`),
   ]);
   return {
     upstream: { commit: upstreamRevision.sha, version, files: { ion, dynamic, desktop }, english },
-    reference: { commit: referenceRevision.sha, files: { ion: frontendReference, desktop: desktopReference } },
+    reference: { commit: referenceRevision.sha, files: { ion: frontendReference, dynamic: dynamicReference, desktop: desktopReference } },
   };
 
   async function request(url) {
