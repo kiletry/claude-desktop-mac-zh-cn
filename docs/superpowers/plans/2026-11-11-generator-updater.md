@@ -12,7 +12,7 @@ Review focus: hostile/malformed release metadata and URLs; repeated windows/star
 - [x] Coordinator tests RED then implementation: startup-once, available/latest/error, no implicit install, busy exclusion and explicit install delegation. Files GeneratorUpdateModel.swift/GeneratorUpdateModelTests.swift; wire SwiftUI menu/banner and operation locks.
 - [x] Installer/checksum/identity/helper behavior tests RED then implementation: staged candidate validated before exit, timeout preserves old target, successful swap, failed validation rollback. Files GeneratorUpdateInstaller.swift, Resources/install-update.sh, tests/update-installer.test.mjs and Swift validation tests. Bundle helper through existing resource builder.
 - [x] Full Node/Swift tests, universal build, real DMG validation and installer prepare against previous release without replacing installed tool; independent review.
-- [ ] Version0.1.26/docs/release notes, merge and tag, follow CI, download and verify public bundle and startup check behavior. Record evidence and limits.
+- [x] Version0.1.26/docs/release notes, merge and tag, follow CI, download and verify public bundle and startup check behavior. Record evidence and limits.
 
 ## Verification and review (2026-11-11)
 
@@ -25,3 +25,12 @@ Review focus: hostile/malformed release metadata and URLs; repeated windows/star
 - Updater verifies SHA256SUMS from the same HTTPS GitHub release and the existing ad hoc bundle signature; this is not independently signed update metadata or Apple notarization. Successful helper installation retains the previous app beside the target for manual recovery.
 
 Final pre-merge rerun: Node144/144, Swift28/28 including real DMG fixture, reviewer helper12/12. Review recheck reports no remaining important issue.
+
+## Published artifact verification
+
+- Released immutable tag `v0.1.26` at `0996d88e4a95e8e8dcbf6360a2d5c1ea2391cef7`; main fast-forwarded to the same implementation. GitHub run [42984947433](https://github.com/kiletry/claude-desktop-mac-zh-cn/actions/runs/42984947433) succeeded, including tests, universal build, clean bundle check and publication.
+- Public Release: https://github.com/kiletry/claude-desktop-mac-zh-cn/releases/tag/v0.1.26 . All four assets downloaded into main checkout `dist/release-v0.1.26`; all three SHA256SUMS entries passed.
+- Public DMG SHA256: `ca3df52c1e2667afd595a34d5648a16e9d8ce4956f4ba747b48d95a535dddcca` (89,828,567 bytes).
+- Read-only mounted downloaded DMG: bundle version0.1.26, manifest sourceCommit0996d88, strict deep codesign valid, arm64/x86_64 both minimum macOS13.0. Bundled helper matches committed file; extracted tgz Swift source/helper and embedded CLI src match release source. Clean embedded CLI test passed without host Node/project files.
+- Authenticated GitHub latest metadata was captured, then fed unchanged to production release-check service with a transport that rejects every asset/download call: current0.1.25 offers v0.1.26, current0.1.26 offers none. Direct anonymous live request remains rate-limited on this network; recovery UI verified, successful real GUI update/restart not claimed. Unit model and real signed helper fixture tests cover explicit installation/restart delegation and swap/rollback.
+- The old v0.1.25 app has no updater, so first upgrade to v0.1.26 is manual. From v0.1.26 onward startup checks metadata only and prompts; download begins only after the installation button.
